@@ -12,6 +12,24 @@
 - **一条 trace 如何跨服务**：请求进入 Traefik 后到 `service-a`；复杂场景继续调用 `service-b`，再到 `service-c`（Redis）或 `service-d`（MySQL）。HTTP 调用传播 W3C TraceContext，相关 span 因而可以在 Jaeger 中串成同一条调用链。
 - **为什么有 TraceId 却查不到 trace**：服务可以在响应中返回 TraceId，但 Collector 的 tail sampling 要等请求结束后再决定是否保留。5xx、ERROR span 和超过 3 秒的慢请求优先保留；普通成功请求仅抽样约 1%。规则见 [`otel/collector.yaml`](otel/collector.yaml)。
 
+## 为什么让 Traefik 做入口
+
+Traefik 在这里模拟应用前面的网关：使用操作台时，浏览器通过 `localhost:18086` 进入，由它按 Host 和路径把 `/ui` 送到静态页面容器、把 `/service-a/...` 送到 Go 服务。这样 UI 的 `fetch('/service-a/...')` 与页面同源，也能观察请求进入业务服务之前的路由、耗时和状态码。
+
+一条从操作台发起的 API 请求会这样经过入口：
+
+1. [`docker-compose.yml`](docker-compose.yml) 把宿主机 `18086` 映射到 Traefik 容器的 `80`；[`traefik/traefik.yaml`](traefik/traefik.yaml) 把 `:80` 定义为 `web` entryPoint。
+2. [`traefik/dynamic.yaml`](traefik/dynamic.yaml) 同时检查 Host（`localhost` 或 `127.0.0.1`）和 `/service-a` 路径前缀，去掉该前缀后转发到 `http://service-a:8080`。例如网关收到 `/service-a/chain/mysql/error`，Go 服务处理的是 `/chain/mysql/error`。
+3. Traefik 的 `tracing` 配置启用 OTel，服务名为 `traefik`，通过 OTLP gRPC 把网关 span 发往 `otel-collector:4317`。它在入口创建或续接请求的 trace，通过 W3C `traceparent` 请求头把同一个 TraceId 传给 `service-a`；后续 Go 服务继续传播。`sampleRate: 1.0` 表示入口追踪每次请求，最终是否进入 Jaeger 仍由 Collector 的尾部采样决定。参见 [Traefik v3.4 的 OTel tracing 文档](https://doc.traefik.io/traefik/v3.4/observability/tracing/opentelemetry/)。
+
+同一个 TraceId 有两个便于核对的出口。Traefik 把它写入 `logs/traefik/access.log` 的 JSON `TraceId` 字段，旁边还有 `RequestPath`、`DownstreamStatus` 等网关信息；Go 服务的 `TraceIDHeaderMiddleware` 在取得有效 span 时把 ID 写入 `X-Trace-Id`，错误响应也可能写入 JSON 的 `trace_id`。页面先读响应头，若响应体有 `trace_id` 则显示响应体中的值。**响应头和页面上的 ID 来自 Go 服务，并非 Traefik 直接添加。**
+
+加载 `/ui` 和点击一个场景是两次独立 HTTP 请求，因此会有不同的 TraceId。排查时使用**场景 API 请求**显示的 ID；它应与 Traefik 对应路径的 access log、Jaeger 中的网关 span 和下游服务 span 一致。若安装了 `jq`，可以查看最近一条该场景的网关日志：
+
+```bash
+jq -c 'select(.RequestPath == "/service-a/chain/mysql/error") | {TraceId, DownstreamStatus, RouterName}' logs/traefik/access.log | tail -1
+```
+
 ## Go 服务怎样接入 OTel
 
 本项目选择 **LoongSuite Go Agent 的编译期自动埋点**。它不是在 `main.go` 中手动创建 TracerProvider 的示例：Agent 负责常见框架和依赖调用的 span，业务代码只在需要表达错误、特殊耗时或返回 TraceId 时使用 OTel API。接入过程可以按下面五步读。
