@@ -28,7 +28,7 @@ Run from this repository root (`go-otel-demo`).
 
 Expected local files and services:
 
-- `scripts/analyze-jaeger-trace.py`
+- `.agents/skills/jaeger-trace-rootcause/scripts/analyze-jaeger-trace.py`
 - Jaeger API at `http://localhost:16686`
 
 If Jaeger is not running, say that trace extraction needs the local compose stack and suggest `docker compose up -d`.
@@ -50,10 +50,10 @@ Do not read `logs/traefik/access.log` or other local log files by default. That 
 Fetch Jaeger data by TraceId:
 
 ```bash
-python3 scripts/analyze-jaeger-trace.py --trace-id TRACE_ID
+python3 .agents/skills/jaeger-trace-rootcause/scripts/analyze-jaeger-trace.py --trace-id TRACE_ID
 ```
 
-If the command fails because local network access is sandboxed, rerun it with the required approval. The script should be used in TraceId mode for this skill; it calls the local Jaeger API and returns cleaned JSON.
+If the command fails because local network access is sandboxed, rerun it with the required approval. The bundled script should be used in TraceId mode for this skill; it calls the local Jaeger API and returns cleaned JSON. The repository-root `scripts/analyze-jaeger-trace.py` remains a separate CLI entrypoint; keep the two copies synchronized when changing the analyzer.
 
 ### 3. Analyze Only the Cleaned JSON
 
@@ -108,7 +108,7 @@ Generate a fresh error trace through Traefik:
 ```bash
 curl -sS -D /tmp/trace-error-headers.txt -o /tmp/trace-error-body.txt -w "%{http_code}\n" http://localhost:18086/service-a/error
 sleep 12
-python3 scripts/analyze-jaeger-trace.py --trace-id TRACE_ID_FROM_RESPONSE
+python3 .agents/skills/jaeger-trace-rootcause/scripts/analyze-jaeger-trace.py --trace-id TRACE_ID_FROM_RESPONSE
 ```
 
 Generate a fresh slow trace through Traefik:
@@ -116,7 +116,7 @@ Generate a fresh slow trace through Traefik:
 ```bash
 curl -sS -D /tmp/trace-slow-headers.txt -o /tmp/trace-slow-body.txt -w "%{http_code}\n" http://localhost:18086/service-a/slow
 sleep 12
-python3 scripts/analyze-jaeger-trace.py --trace-id TRACE_ID_FROM_RESPONSE
+python3 .agents/skills/jaeger-trace-rootcause/scripts/analyze-jaeger-trace.py --trace-id TRACE_ID_FROM_RESPONSE
 ```
 
 Read `X-Trace-Id` from the saved response headers (or `trace_id` from the error body). The `sleep 12` accounts for Collector `tail_sampling.decision_wait: 10s`.

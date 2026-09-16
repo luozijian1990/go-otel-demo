@@ -115,7 +115,7 @@ curl -i http://localhost:18086/service-a/chain/mysql/error
 
 这张截图来自一次真实运行。对应 trace 经 Jaeger 核对后的调用链是 `Traefik → service-a → service-b → service-d → MySQL`；最深的失败 span 是 `service-d` 的 `SELECT users_table_that_does_not_exist`，错误是 MySQL 1146（表不存在）。Traefik 的 500 是下游错误向入口传播的结果。截图中的 TraceId 属于一次临时运行，Jaeger 重启后可能查不到，请使用自己刚生成的 TraceId。
 
-仓库内的 [Jaeger 根因分析 Skill](.agents/skills/jaeger-trace-rootcause/SKILL.md) 会按 TraceId 调用本地 Jaeger API，清洗 span 数据后给出「结论、证据、调用链、下一步」。不用 Skill 时也可以直接运行同一份分析脚本：
+仓库内的 [Jaeger 根因分析 Skill](.agents/skills/jaeger-trace-rootcause/SKILL.md) 自带[分析脚本](.agents/skills/jaeger-trace-rootcause/scripts/analyze-jaeger-trace.py)，会按 TraceId 调用本地 Jaeger API，清洗 span 数据后给出「结论、证据、调用链、下一步」。不用 Skill 时仍可运行仓库根目录保留的命令行脚本：
 
 ```bash
 python3 scripts/analyze-jaeger-trace.py --trace-id TRACE_ID_FROM_UI
