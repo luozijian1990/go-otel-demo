@@ -1,0 +1,32 @@
+# Static Traefik configuration for the local demo.
+# The dashboard is intentionally insecure and must not be used in production.
+entryPoints:
+  web:
+    address: ":80"
+
+api:
+  dashboard: true
+  insecure: true
+
+providers:
+  file:
+    filename: /etc/traefik/dynamic.yaml
+    watch: true
+
+log:
+  level: INFO
+  format: json
+
+accessLog:
+  filePath: /logs/access.log
+  format: json
+  fields:
+    defaultMode: keep
+
+tracing:
+  serviceName: traefik
+  sampleRate: 1.0
+  otlp:
+    grpc:
+      endpoint: otel-collector:4317
+      insecure: true

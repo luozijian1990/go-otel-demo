@@ -1,0 +1,93 @@
+http:
+  routers:
+    service-a:
+      entryPoints:
+        - web
+      rule: (Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/service-a`)
+      middlewares:
+        - strip-service-a
+      service: service-a
+
+    service-b:
+      entryPoints:
+        - web
+      rule: (Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/service-b`)
+      middlewares:
+        - strip-service-b
+      service: service-b
+
+    service-c:
+      entryPoints:
+        - web
+      rule: (Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/service-c`)
+      middlewares:
+        - strip-service-c
+      service: service-c
+
+    service-d:
+      entryPoints:
+        - web
+      rule: (Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/service-d`)
+      middlewares:
+        - strip-service-d
+      service: service-d
+
+    demo-ui:
+      entryPoints:
+        - web
+      rule: (Host(`localhost`) || Host(`127.0.0.1`)) && PathPrefix(`/ui`)
+      middlewares:
+        - strip-ui
+      service: demo-ui
+
+  middlewares:
+    strip-service-a:
+      stripPrefix:
+        prefixes:
+          - /service-a
+
+    strip-service-b:
+      stripPrefix:
+        prefixes:
+          - /service-b
+
+    strip-service-c:
+      stripPrefix:
+        prefixes:
+          - /service-c
+
+    strip-service-d:
+      stripPrefix:
+        prefixes:
+          - /service-d
+
+    strip-ui:
+      stripPrefix:
+        prefixes:
+          - /ui
+
+  services:
+    service-a:
+      loadBalancer:
+        servers:
+          - url: http://service-a:8080
+
+    service-b:
+      loadBalancer:
+        servers:
+          - url: http://service-b:8080
+
+    service-c:
+      loadBalancer:
+        servers:
+          - url: http://service-c:8080
+
+    service-d:
+      loadBalancer:
+        servers:
+          - url: http://service-d:8080
+
+    demo-ui:
+      loadBalancer:
+        servers:
+          - url: http://demo-ui:80

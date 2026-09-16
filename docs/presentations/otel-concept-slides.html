@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OpenTelemetry 是什么 · 内部扫盲</title>
+
+<!-- Fonts: JetBrains Mono (mono) + Noto Sans SC (body) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+/* ===========================================
+   THEME — Observability Console
+   =========================================== */
+:root {
+    --bg: #0d1117;
+    --bg-elevated: #161b22;
+    --bg-soft: #1c2128;
+    --border: #30363d;
+    --border-soft: #21262d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim: #6e7681;
+    --accent: #58a6ff;        /* span blue */
+    --accent-dim: #1f6feb;
+    --accent-2: #a371f7;      /* decision chip */
+    --warn: #f78166;          /* slow */
+    --err: #ff7b72;           /* 5xx / ERROR */
+    --ok: #3fb950;            /* success */
+    --yellow: #d29922;
+
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+    --font-body: 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+
+    --title-size: clamp(1.5rem, 4.5vw, 3.4rem);
+    --h2-size: clamp(1.15rem, 3vw, 2.1rem);
+    --h3-size: clamp(0.95rem, 2vw, 1.4rem);
+    --body-size: clamp(0.75rem, 1.3vw, 1rem);
+    --small-size: clamp(0.65rem, 1vw, 0.85rem);
+    --tiny-size: clamp(0.6rem, 0.85vw, 0.75rem);
+
+    --slide-padding: clamp(1.2rem, 3.5vw, 3rem);
+    --content-gap: clamp(0.6rem, 1.6vw, 1.4rem);
+    --element-gap: clamp(0.3rem, 0.9vw, 0.8rem);
+
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur: 0.5s;
+}
+
+/* ===========================================
+   PASTE viewport-base.css (mandatory)
+   =========================================== */
+html, body { height: 100%; overflow-x: hidden; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    font-size: var(--body-size);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    /* Subtle grid for "panel" feel */
+    background-image:
+        linear-gradient(rgba(48,54,61,0.18) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(48,54,61,0.18) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: -1px -1px;
+}
+
+.slide {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.slide-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    max-height: 100%;
+    overflow: hidden;
+    padding: var(--slide-padding);
+    padding-top: clamp(2.8rem, 5vw, 4rem);
+    padding-bottom: clamp(1.6rem, 3vw, 2.2rem);
+    gap: var(--element-gap);
+}
+
+@media (max-height: 700px) {
+    :root {
+        --slide-padding: clamp(0.9rem, 2.5vw, 2rem);
+        --title-size: clamp(1.2rem, 4vw, 2.4rem);
+        --h2-size: clamp(1rem, 2.6vw, 1.7rem);
+    }
+}
+@media (max-height: 600px) {
+    :root {
+        --slide-padding: clamp(0.7rem, 2vw, 1.4rem);
+        --body-size: clamp(0.7rem, 1.1vw, 0.9rem);
+    }
+    .nav-dots, .keyboard-hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.2s !important;
+    }
+    html { scroll-behavior: auto; }
+}
+
+/* ===========================================
+   WINDOW-CHROME HEADER (per-slide)
+   =========================================== */
+.chrome {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: clamp(2.2rem, 3.5vw, 2.8rem);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0 clamp(0.8rem, 2vw, 1.6rem);
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+    z-index: 5;
+}
+.chrome .dots { display: flex; gap: 6px; }
+.chrome .dot { width: 11px; height: 11px; border-radius: 50%; }
+.chrome .dot.red    { background: #ff5f57; }
+.chrome .dot.yellow { background: #febc2e; }
+.chrome .dot.green  { background: #28c840; }
+.chrome .label { flex: 1; text-align: center; letter-spacing: 0.5px; }
+.chrome .label .step-num { color: var(--accent); }
+.chrome .ts { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+/* Bottom border + page number */
+.foot {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: clamp(1.4rem, 2.2vw, 1.8rem);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(0.8rem, 2vw, 1.6rem);
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-dim);
+    z-index: 5;
+}
+.foot .left { color: var(--text-dim); }
+.foot .right { color: var(--text-muted); }
+
+/* ===========================================
+   TYPOGRAPHY
+   =========================================== */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; color: var(--text); }
+h1 { font-size: var(--title-size); }
+h2 { font-size: var(--h2-size); }
+h3 { font-size: var(--h3-size); }
+p { color: var(--text); }
+code, .mono { font-family: var(--font-mono); }
+strong { color: var(--text); font-weight: 600; }
+em { font-style: normal; color: var(--accent); font-family: var(--font-mono); }
+
+/* Title with accent underline (Grafana panel header) */
+.panel-title {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: clamp(0.6rem, 1.5vw, 1.2rem);
+    position: relative;
+}
+.panel-title::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: clamp(40px, 6vw, 80px);
+    height: 2px;
+    background: var(--accent);
+}
+.panel-title .step-pill {
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--accent);
+    background: rgba(88,166,255,0.12);
+    border: 1px solid rgba(88,166,255,0.35);
+    padding: 0.15rem 0.55rem;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+.panel-title .step-pill.demo { color: var(--err); background: rgba(255,123,114,0.12); border-color: rgba(255,123,114,0.4); }
+.panel-title h2 { margin: 0; }
+.panel-title .meta {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+}
+
+/* ===========================================
+   COMMON COMPONENTS
+   =========================================== */
+
+/* Decision chip */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    background: rgba(163,113,247,0.16);
+    color: #d2a8ff;
+    border: 1px solid rgba(163,113,247,0.4);
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.chip::before { content: '▸'; color: var(--accent-2); }
+.chip.demo {
+    background: rgba(255,123,114,0.14);
+    color: var(--err);
+    border-color: rgba(255,123,114,0.4);
+}
+.chip.demo::before { content: '●'; color: var(--err); }
+.chip.ok { background: rgba(63,185,80,0.14); color: var(--ok); border-color: rgba(63,185,80,0.4); }
+.chip.ok::before { content: '✓'; color: var(--ok); }
+.chip.warn { background: rgba(247,129,102,0.14); color: var(--warn); border-color: rgba(247,129,102,0.4); }
+.chip.warn::before { content: '◆'; color: var(--warn); }
+
+/* Bullet rows with decision tags */
+.bullets { display: flex; flex-direction: column; gap: clamp(0.45rem, 1vw, 0.85rem); }
+.bullet {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    font-size: var(--body-size);
+}
+.bullet .b-mark {
+    flex-shrink: 0;
+    width: 1.4rem;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-weight: 600;
+    line-height: 1.5;
+}
+.bullet .b-text { flex: 1; color: var(--text); }
+.bullet .b-text .q { color: var(--text-muted); font-size: var(--small-size); font-style: italic; }
+
+/* Card */
+.card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: clamp(0.7rem, 1.6vw, 1.2rem);
+    position: relative;
+}
+.card .label {
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+}
+.card h3 { font-size: var(--h3-size); margin-bottom: 0.3rem; }
+.card p { font-size: var(--small-size); color: var(--text-muted); }
+
+/* Code block */
+.code {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    padding: clamp(0.7rem, 1.4vw, 1.1rem) clamp(0.9rem, 1.8vw, 1.4rem);
+    font-family: var(--font-mono);
+    font-size: clamp(0.65rem, 1.05vw, 0.85rem);
+    line-height: 1.65;
+    overflow: hidden;
+    position: relative;
+    color: var(--text);
+}
+.code .lang {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.8rem;
+    font-size: var(--tiny-size);
+    color: var(--text-dim);
+    background: var(--bg);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+.code .ln { color: var(--text-dim); margin-right: 0.8rem; user-select: none; }
+.code .kw  { color: #ff7b72; }
+.code .str { color: #a5d6ff; }
+.code .num { color: #79c0ff; }
+.code .com { color: var(--text-dim); font-style: italic; }
+.code .fn  { color: #d2a8ff; }
+.code .typ { color: #ffa657; }
+
+/* Two columns */
+.two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: clamp(0.7rem, 2vw, 1.4rem);
+    flex: 1;
+    min-height: 0;
+}
+.col { display: flex; flex-direction: column; gap: clamp(0.4rem, 1vw, 0.8rem); min-height: 0; }
+
+/* Comparison table */
+.cmp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--small-size);
+    font-family: var(--font-body);
+}
+.cmp-table th, .cmp-table td {
+    text-align: left;
+    padding: clamp(0.4rem, 0.9vw, 0.7rem);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+.cmp-table th {
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    background: var(--bg-elevated);
+}
+.cmp-table td.mono { font-family: var(--font-mono); font-size: var(--small-size); color: var(--accent); }
+.cmp-table tr:last-child td { border-bottom: none; }
+.cmp-table .verdict-ok  { color: var(--ok); }
+.cmp-table .verdict-mid { color: var(--warn); }
+.cmp-table .verdict-bad { color: var(--err); }
+
+/* ===========================================
+   ANIMATION
+   =========================================== */
+.reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity var(--dur) var(--ease-out), transform var(--dur) var(--ease-out);
+}
+.slide.visible .reveal { opacity: 1; transform: translateY(0); }
+.slide.visible .reveal:nth-child(1) { transition-delay: 0.05s; }
+.slide.visible .reveal:nth-child(2) { transition-delay: 0.15s; }
+.slide.visible .reveal:nth-child(3) { transition-delay: 0.25s; }
+.slide.visible .reveal:nth-child(4) { transition-delay: 0.35s; }
+.slide.visible .reveal:nth-child(5) { transition-delay: 0.45s; }
+.slide.visible .reveal:nth-child(6) { transition-delay: 0.55s; }
+.slide.visible .reveal:nth-child(7) { transition-delay: 0.65s; }
+.slide.visible .reveal:nth-child(8) { transition-delay: 0.75s; }
+.slide.visible .reveal:nth-child(9) { transition-delay: 0.85s; }
+
+/* ===========================================
+   TITLE SLIDE (P1)
+   =========================================== */
+.title-slide { display: flex; align-items: center; justify-content: center; }
+.title-slide .content { text-align: center; padding: var(--slide-padding); max-width: 90vw; }
+.title-slide .kicker {
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: clamp(1rem, 2vw, 1.8rem);
+}
+.title-slide h1 {
+    font-size: clamp(1.7rem, 5vw, 3.8rem);
+    line-height: 1.15;
+    margin-bottom: clamp(0.8rem, 1.8vw, 1.4rem);
+    letter-spacing: -0.5px;
+}
+.title-slide h1 .hi { color: var(--accent); }
+.title-slide .sub {
+    font-family: var(--font-mono);
+    font-size: clamp(0.85rem, 1.8vw, 1.2rem);
+    color: var(--text-muted);
+    margin-bottom: clamp(1.5rem, 3vw, 2.4rem);
+}
+.title-slide .note {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--warn);
+    background: rgba(247,129,102,0.08);
+    border: 1px solid rgba(247,129,102,0.3);
+    padding: 0.4rem 0.9rem;
+    border-radius: 4px;
+}
+.title-slide .blink { animation: blink 1.4s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* Title slide background pattern: faint trace lines */
+.trace-bg {
+    position: absolute; inset: 0; opacity: 0.5;
+    pointer-events: none;
+}
+
+/* ===========================================
+   ROADMAP (P3)
+   =========================================== */
+.roadmap-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: clamp(0.5rem, 1.2vw, 1rem);
+    flex: 1;
+    min-height: 0;
+}
+.roadmap-grid .step-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: clamp(0.6rem, 1.3vw, 1rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    position: relative;
+    overflow: hidden;
+}
+.roadmap-grid .step-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--accent);
+}
+.roadmap-grid .step-card.climax::before { background: var(--err); }
+.roadmap-grid .step-card .num {
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+    letter-spacing: 1px;
+}
+.roadmap-grid .step-card .num .n { color: var(--accent); }
+.roadmap-grid .step-card.climax .num .n { color: var(--err); }
+.roadmap-grid .step-card h3 {
+    font-size: clamp(0.85rem, 1.3vw, 1.05rem);
+    margin: 0;
+    line-height: 1.25;
+}
+.roadmap-grid .step-card .delivery {
+    font-size: var(--small-size);
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+.roadmap-grid .legend-card {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    padding: 0.6rem;
+    text-align: center;
+    line-height: 1.5;
+}
+
+/* ===========================================
+   TECH STACK CHIPS (P2)
+   =========================================== */
+.stack { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.stack .s-chip {
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    padding: 0.25rem 0.55rem;
+    border-radius: 3px;
+}
+.stack .s-chip.hi { color: var(--accent); border-color: rgba(88,166,255,0.4); }
+
+/* ===========================================
+   TRACE TOPOLOGY (SVG) (P8 / P15 / P18)
+   =========================================== */
+.topology {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: clamp(0.6rem, 1.4vw, 1.2rem);
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.topology svg { width: 100%; height: 100%; max-height: 100%; }
+.topology .node-box { fill: var(--bg); stroke: var(--border); stroke-width: 1.5; rx: 6; }
+.topology .node-box.accent { stroke: var(--accent); }
+.topology .node-box.err { stroke: var(--err); }
+.topology .node-box.warn { stroke: var(--warn); }
+.topology .node-label {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    fill: var(--text);
+}
+.topology .node-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    fill: var(--text-muted);
+}
+.topology .link { stroke: var(--accent); stroke-width: 1.5; fill: none; }
+.topology .link.err { stroke: var(--err); stroke-dasharray: 5 4; }
+.topology .link.warn { stroke: var(--warn); }
+.topology .link.dim { stroke: var(--border); stroke-width: 1; }
+.topology .arrow-head { fill: var(--accent); }
+.topology .arrow-head.err { fill: var(--err); }
+.topology .arrow-head.warn { fill: var(--warn); }
+
+/* ===========================================
+   TAIL SAMPLING GRID (P12)
+   =========================================== */
+.sampling-stage {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: clamp(0.7rem, 1.6vw, 1.2rem);
+    flex: 1;
+    min-height: 0;
+}
+.sampling-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: var(--small-size);
+    align-self: center;
+    min-width: 0;
+}
+.sampling-legend .lg {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+}
+.sampling-legend .swatch {
+    width: 16px; height: 16px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.sampling-legend .swatch.kept { background: var(--accent); }
+.sampling-legend .swatch.kept-err { background: var(--err); }
+.sampling-legend .swatch.kept-warn { background: var(--warn); }
+.sampling-legend .swatch.drop { background: var(--bg-elevated); border: 1px solid var(--border); }
+
+.sampling-grid {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    gap: 4px;
+    flex: 1;
+    align-content: center;
+    min-height: 0;
+}
+.sampling-grid .cell {
+    aspect-ratio: 1;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-soft);
+    border-radius: 2px;
+}
+.sampling-grid .cell.kept { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 8px rgba(88,166,255,0.5); }
+.sampling-grid .cell.kept-err { background: var(--err); border-color: var(--err); box-shadow: 0 0 8px rgba(255,123,114,0.5); }
+.sampling-grid .cell.kept-warn { background: var(--warn); border-color: var(--warn); box-shadow: 0 0 8px rgba(247,129,102,0.5); }
+
+/* ===========================================
+   SCENARIO LIST (P15)
+   =========================================== */
+.scenario-list { display: flex; flex-direction: column; gap: clamp(0.3rem, 0.8vw, 0.6rem); font-size: var(--small-size); }
+.scenario-list .row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.6rem;
+    padding: 0.4rem 0.5rem;
+    border-bottom: 1px dashed var(--border);
+    align-items: center;
+}
+.scenario-list .row:last-child { border-bottom: none; }
+.scenario-list .path { font-family: var(--font-mono); font-size: var(--tiny-size); color: var(--accent); }
+.scenario-list .desc { color: var(--text-muted); }
+.scenario-list .shape { font-family: var(--font-mono); font-size: var(--tiny-size); color: var(--text-dim); }
+
+/* ===========================================
+   PROGRESS BAR + NAV DOTS
+   =========================================== */
+.progress-bar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 2px;
+    background: var(--accent);
+    width: 0%;
+    z-index: 100;
+    transition: width 0.2s ease;
+    box-shadow: 0 0 8px var(--accent);
+}
+.nav-dots {
+    position: fixed;
+    right: clamp(0.6rem, 1.5vw, 1.2rem);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 50;
+}
+.nav-dots button {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    border: 1px solid var(--text-dim);
+    background: transparent;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.25s var(--ease-out);
+}
+.nav-dots button.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    transform: scale(1.4);
+}
+.nav-dots button:hover { border-color: var(--accent); }
+
+/* ===========================================
+   RECAP STRIP (P20)
+   =========================================== */
+.recap-strip {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: clamp(0.3rem, 0.8vw, 0.6rem);
+    flex: 1;
+    align-items: stretch;
+    min-height: 0;
+}
+.recap-strip .seg {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: clamp(0.4rem, 1vw, 0.8rem);
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    position: relative;
+    overflow: hidden;
+}
+.recap-strip .seg::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+}
+.recap-strip .seg.climax::before { background: linear-gradient(90deg, var(--err), transparent); }
+.recap-strip .seg .n {
+    font-family: var(--font-mono);
+    font-size: var(--small-size);
+    color: var(--accent);
+    font-weight: 700;
+}
+.recap-strip .seg.climax .n { color: var(--err); }
+.recap-strip .seg h4 {
+    font-size: clamp(0.7rem, 1.1vw, 0.9rem);
+    line-height: 1.2;
+}
+.recap-strip .seg .what {
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+    line-height: 1.45;
+    margin-top: auto;
+}
+
+/* ===========================================
+   CLOSING (P22)
+   =========================================== */
+.closing { display: flex; align-items: center; justify-content: center; }
+.closing .content { text-align: center; padding: var(--slide-padding); max-width: 85vw; }
+.closing .glyph {
+    font-family: var(--font-mono);
+    font-size: clamp(2rem, 5vw, 4rem);
+    color: var(--accent);
+    margin-bottom: clamp(0.8rem, 1.8vw, 1.4rem);
+}
+.closing h2 {
+    font-size: clamp(1.4rem, 3.8vw, 2.8rem);
+    margin-bottom: clamp(0.6rem, 1.4vw, 1.1rem);
+}
+.closing .hook {
+    font-family: var(--font-mono);
+    font-size: clamp(0.9rem, 1.6vw, 1.15rem);
+    color: var(--accent);
+    margin-top: clamp(0.8rem, 1.8vw, 1.4rem);
+    padding: 0.8rem 1.2rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-elevated);
+    display: inline-block;
+}
+
+/* Utility */
+.flex-1 { flex: 1; min-height: 0; }
+.gap-sm { gap: clamp(0.3rem, 0.8vw, 0.6rem); }
+.dim { color: var(--text-muted); }
+.muted { color: var(--text-dim); }
+.hi-accent { color: var(--accent); }
+.hi-err { color: var(--err); }
+.hi-warn { color: var(--warn); }
+.hi-ok { color: var(--ok); }
+.hi-purple { color: var(--accent-2); }
+.tag-old {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--warn);
+    border: 1px solid rgba(247,129,102,0.4);
+    background: rgba(247,129,102,0.08);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    margin-right: 0.3rem;
+}
+.tag-new {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--accent);
+    border: 1px solid rgba(88,166,255,0.4);
+    background: rgba(88,166,255,0.08);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    margin-right: 0.3rem;
+}
+
+/* Cross-section banner */
+.banner {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-2);
+    padding: clamp(0.5rem, 1.1vw, 0.9rem) clamp(0.7rem, 1.4vw, 1.1rem);
+    font-size: var(--small-size);
+    color: var(--text);
+    border-radius: 4px;
+}
+.banner.warn { border-left-color: var(--warn); }
+.banner.err { border-left-color: var(--err); }
+.banner .b-title {
+    font-family: var(--font-mono);
+    font-size: var(--tiny-size);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.3rem;
+}
+
+
+/* ===========================================
+   IMAGE LIGHTBOX (click-to-zoom screenshots)
+   =========================================== */
+.shot-frame img { cursor: zoom-in; }
+.lightbox {
+    position: fixed; inset: 0; z-index: 200;
+    display: none; align-items: center; justify-content: center;
+    background: rgba(1,4,9,0.92);
+    -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+}
+.lightbox.open { display: flex; }
+.lightbox img {
+    max-width: 92vw; max-height: 86vh;
+    transform-origin: center center;
+    transition: transform 0.12s var(--ease-out);
+    cursor: grab; user-select: none; -webkit-user-drag: none;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--bg);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+}
+.lightbox img.grabbing { cursor: grabbing; transition: none; }
+.lightbox .lb-controls {
+    position: fixed; bottom: clamp(1rem,3vh,2rem); left: 50%; transform: translateX(-50%);
+    display: flex; gap: 0.35rem; align-items: center;
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.35rem 0.45rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.lightbox .lb-controls button {
+    width: 2rem; height: 2rem; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--bg);
+    color: var(--text); font-family: var(--font-mono); font-size: 1.05rem;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s var(--ease-out);
+}
+.lightbox .lb-controls button:hover { border-color: var(--accent); color: var(--accent); }
+.lightbox .lb-zoom {
+    min-width: 3.4rem; text-align: center;
+    font-family: var(--font-mono); font-size: var(--tiny-size); color: var(--text-muted);
+}
+.lightbox .lb-close {
+    position: fixed; top: clamp(0.8rem,2vh,1.4rem); right: clamp(0.8rem,2vw,1.4rem);
+    width: 2.3rem; height: 2.3rem; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg-elevated);
+    color: var(--text-muted); font-family: var(--font-mono); font-size: 1.1rem;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s var(--ease-out);
+}
+.lightbox .lb-close:hover { border-color: var(--err); color: var(--err); }
+.lightbox .lb-hint {
+    position: fixed; top: clamp(0.9rem,2vh,1.5rem); left: 50%; transform: translateX(-50%);
+    font-family: var(--font-mono); font-size: var(--tiny-size); color: var(--text-dim);
+}
+</style>
+</head>
+<body>
+
+<div class="progress-bar"></div>
+<nav class="nav-dots" aria-label="slide navigation"></nav>
+
+<!-- ===========================================
+     P01 · TITLE
+     =========================================== -->
+<section class="slide title-slide" data-title="标题页">
+    <svg class="trace-bg" viewBox="0 0 1200 700" preserveAspectRatio="xMidYMid slice">
+        <defs>
+            <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+                <path d="M 48 0 L 0 0 0 48" fill="none" stroke="rgba(48,54,61,0.25)" stroke-width="0.5"/>
+            </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)"/>
+        <g opacity="0.18">
+            <rect x="80"  y="120" width="260" height="14" rx="2" fill="#58a6ff"/>
+            <rect x="120" y="140" width="180" height="10" rx="2" fill="#58a6ff"/>
+            <rect x="160" y="156" width="110" height="10" rx="2" fill="#3fb950"/>
+            <rect x="180" y="172" width="70"  height="10" rx="2" fill="#3fb950"/>
+
+            <rect x="840" y="500" width="260" height="14" rx="2" fill="#ff7b72"/>
+            <rect x="880" y="520" width="200" height="10" rx="2" fill="#ff7b72"/>
+            <rect x="920" y="536" width="140" height="10" rx="2" fill="#f78166"/>
+        </g>
+    </svg>
+    <div class="content">
+        <div class="kicker reveal">内部分享 · 可观测性扫盲</div>
+        <h1 class="reveal">说清楚 <span class="hi">OpenTelemetry</span><br/>到底是个啥</h1>
+        <div class="sub reveal">从一次请求 → Trace → SDK → Collector → 后端<span class="blink">_</span></div>
+        <div class="note reveal">⚠ 概念扫盲为主 + 带你读懂一份 Collector 配置</div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P01 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P02 · 痛点开场
+     =========================================== -->
+<section class="slide" data-title="痛点">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">why</span> · 没有 trace 的世界有多痛</div>
+        <div class="ts">02 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">PAIN</span>
+            <h2>"这个请求又慢又报错,你怎么查?"</h2>
+            <span class="meta">4 个服务 · 一条链路</span>
+        </div>
+
+        <div class="topology reveal flex-1">
+            <svg viewBox="0 0 900 250" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <marker id="arr1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                        <path d="M0,0 L10,5 L0,10 Z" fill="#58a6ff"/>
+                    </marker>
+                    <marker id="arr1e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                        <path d="M0,0 L10,5 L0,10 Z" fill="#ff7b72"/>
+                    </marker>
+                </defs>
+                <rect class="node-box" x="20" y="95" width="100" height="56"/>
+                <text class="node-label" x="70" y="120" text-anchor="middle">user</text>
+                <text class="node-sub" x="70" y="138" text-anchor="middle">慢 + 500</text>
+
+                <rect class="node-box accent" x="180" y="95" width="120" height="56"/>
+                <text class="node-label" x="240" y="120" text-anchor="middle" fill="#58a6ff">service-a</text>
+                <text class="node-sub" x="240" y="138" text-anchor="middle">入口</text>
+
+                <rect class="node-box accent" x="360" y="95" width="120" height="56"/>
+                <text class="node-label" x="420" y="120" text-anchor="middle" fill="#58a6ff">service-b</text>
+
+                <rect class="node-box" x="540" y="40" width="120" height="56"/>
+                <text class="node-label" x="600" y="65" text-anchor="middle">service-c</text>
+                <text class="node-sub" x="600" y="83" text-anchor="middle">Redis</text>
+
+                <rect class="node-box err" x="540" y="150" width="120" height="56"/>
+                <text class="node-label" x="600" y="175" text-anchor="middle" fill="#ff7b72">service-d</text>
+                <text class="node-sub" x="600" y="193" text-anchor="middle" fill="#ff7b72">MySQL · 报错?</text>
+
+                <path class="link" d="M 120 123 L 175 123" marker-end="url(#arr1)"/>
+                <path class="link" d="M 300 123 L 355 123" marker-end="url(#arr1)"/>
+                <path class="link" d="M 480 110 L 535 80" marker-end="url(#arr1)"/>
+                <path class="link err" d="M 480 135 L 535 168" marker-end="url(#arr1e)"/>
+
+                <text x="730" y="100" font-family="JetBrains Mono" font-size="12" fill="#8b949e">慢在哪一跳?</text>
+                <text x="730" y="122" font-family="JetBrains Mono" font-size="12" fill="#ff7b72">谁先返回 500?</text>
+                <text x="730" y="144" font-family="JetBrains Mono" font-size="12" fill="#8b949e">日志怎么对齐?</text>
+            </svg>
+        </div>
+
+        <div class="bullets reveal">
+            <div class="bullet">
+                <div class="b-mark">▸</div>
+                <div class="b-text"><strong>传统做法</strong>:开 4 个终端 <code>grep</code> 各自的日志,靠时间戳手工拼时序 —— 服务一多就抓瞎。</div>
+            </div>
+            <div class="bullet">
+                <div class="b-mark">▸</div>
+                <div class="b-text">日志只告诉你"<span class="hi-err">这台机器发生了什么</span>",却拼不出"<span class="hi-accent">这一次请求经过了哪些机器、各花了多久</span>"。</div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P02 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P03 · 遥测与可观测性
+     =========================================== -->
+<section class="slide" data-title="遥测与可观测性">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">concept</span> · 监控 vs 可观测性</div>
+        <div class="ts">03 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">OBSERVABILITY</span>
+            <h2>遥测、三支柱,以及"可观测性"到底新在哪</h2>
+        </div>
+
+        <div class="banner reveal">
+            <div class="b-title">// 遥测 telemetry</div>
+            系统主动发出的、关于它自己行为的数据。三种形态:<strong class="hi-accent">Traces 链路</strong> · <strong>Metrics 指标</strong> · <strong>Logs 日志</strong>。本场只聚焦 <span class="hi-accent">Traces</span>。
+        </div>
+
+        <div class="two-col flex-1">
+            <div class="col">
+                <table class="cmp-table reveal">
+                    <thead><tr><th>维度</th><th>监控 Monitoring</th><th>可观测性 Observability</th></tr></thead>
+                    <tbody>
+                        <tr><td class="mono">回答的问题</td><td>出事了吗?</td><td class="verdict-ok">为什么出事?</td></tr>
+                        <tr><td class="mono">典型形态</td><td>CPU/QPS 仪表盘报警</td><td>顺着一次请求往下钻</td></tr>
+                        <tr><td class="mono">面对未知</td><td class="verdict-mid">只能看预设好的指标</td><td class="verdict-ok">能问没预设过的问题</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="col">
+                <div class="card reveal"><div class="label">Traces · 本场主角</div><h3>一次请求的完整旅程</h3><p>跨服务串成一棵树,定位"哪一跳慢/错"。</p></div>
+                <div class="card reveal"><div class="label">Metrics</div><h3>可聚合的数字</h3><p>QPS、延迟分位、错误率 —— 看趋势和报警。</p></div>
+                <div class="card reveal"><div class="label">Logs</div><h3>离散的事件文本</h3><p>某时刻某行代码说了什么。最细,但最难拼时序。</p></div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P03 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P04 · Trace 与 Span  (真截图位)
+     =========================================== -->
+<section class="slide" data-title="Trace 与 Span">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">concept</span> · 一次请求 = 一棵 span 树</div>
+        <div class="ts">04 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">TRACE</span>
+            <h2>Trace 是树,Span 是树上的每一段</h2>
+            <span class="meta">例:GET /chain/mysql/error</span>
+        </div>
+
+        <div class="two-col flex-1">
+            <div class="col">
+                <div class="shot-frame reveal" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:0.5rem;flex:1;display:flex;min-height:0">
+                    <img src="assets/jaeger-chain-trace.png" alt="Jaeger trace tree" style="width:100%;height:100%;object-fit:contain;border-radius:4px;display:block" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+                    <div class="shot-ph" style="display:none;flex:1;align-items:center;justify-content:center;flex-direction:column;gap:0.5rem;font-family:var(--font-mono);font-size:var(--tiny-size);color:var(--text-dim);text-align:center;border:1px dashed var(--border);border-radius:4px;padding:1rem">
+                        <div style="font-size:1.6rem">📷</div>
+                        <div>截图占位 · Jaeger trace tree</div>
+                        <div class="muted">assets/jaeger-chain-trace.png</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="bullets reveal">
+                    <div class="bullet"><div class="b-mark">①</div><div class="b-text"><strong>Trace</strong> = 一次完整请求,有唯一 <code class="hi-accent">traceId</code>。上图整棵树就是一个 trace。</div></div>
+                    <div class="bullet"><div class="b-mark">②</div><div class="b-text"><strong>Span</strong> = 其中一段工作(一次 HTTP 处理、一次 SQL、一次 Redis 调用),是树上的一个节点。</div></div>
+                    <div class="bullet"><div class="b-mark">③</div><div class="b-text">每个 span 记着 <code>parentId</code>,父子关系拼出<strong>树</strong>;缩进越深 = 调用越往下游。</div></div>
+                    <div class="bullet"><div class="b-mark">④</div><div class="b-text">span 的<strong>长度</strong>就是耗时 —— 一眼看出"<span class="hi-warn">哪一段最长</span>";<span class="hi-err">红色</span>那段就是出错的地方。</div></div>
+                </div>
+                <div class="banner reveal" style="font-size:var(--tiny-size)">
+                    <div class="b-title">// 一句话</div>
+                    看日志是"逐行读流水账",看 trace 是"一张 X 光片"。
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P04 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P05 · Span 里装什么  (console JSON)
+     =========================================== -->
+<section class="slide" data-title="Span 结构">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">concept</span> · 拆开一个 span 看字段</div>
+        <div class="ts">05 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">SPAN</span>
+            <h2>一个 span 长这样(SDK 自动产出,没手写一行)</h2>
+        </div>
+
+        <div class="two-col flex-1">
+            <div class="col">
+                <div class="code reveal" style="white-space:pre-wrap;flex:1"><span class="lang">console span</span><span class="com">// SDK 把 span 直接打到控制台的样子</span>
+{
+  <span class="fn">traceId</span>:   <span class="str">'7fcccd0a...eddc544'</span>,
+  <span class="fn">parentId</span>:  <span class="str">'a1b2c3d4e5f60718'</span>,
+  <span class="fn">name</span>:      <span class="str">'GET /chain/mysql/error'</span>,
+  <span class="fn">id</span>:        <span class="str">'188af03d8d92b148'</span>,
+  <span class="fn">kind</span>:      <span class="num">1</span>,            <span class="com">// SERVER</span>
+  <span class="fn">timestamp</span>: <span class="num">1688624928628000</span>,
+  <span class="fn">duration</span>:  <span class="num">41200</span>,        <span class="com">// 微秒</span>
+  <span class="fn">attributes</span>: {
+    <span class="str">'http.method'</span>: <span class="str">'GET'</span>,
+    <span class="str">'http.route'</span>:  <span class="str">'/chain/mysql/error'</span>,
+    <span class="str">'http.status_code'</span>: <span class="num">500</span>
+  },
+  <span class="fn">status</span>: { <span class="fn">code</span>: <span class="num">2</span>, <span class="fn">message</span>: <span class="str">'ERROR'</span> },
+  <span class="fn">events</span>: [ { <span class="fn">name</span>: <span class="str">'exception'</span>, ... } ],
+  <span class="fn">links</span>: []
+}</div>
+            </div>
+            <div class="col">
+                <div class="bullets reveal">
+                    <div class="bullet"><div class="b-mark">id</div><div class="b-text"><code>traceId</code> 同一请求都一样;<code>id</code>/<code>parentId</code> 拼父子。</div></div>
+                    <div class="bullet"><div class="b-mark">⏱</div><div class="b-text"><code>timestamp</code>+<code>duration</code> = 在哪开始、跑了多久。</div></div>
+                    <div class="bullet"><div class="b-mark">🏷</div><div class="b-text"><code>attributes</code> = 标签键值对(方法/路由/状态码/SQL...),查询和过滤全靠它。</div></div>
+                    <div class="bullet"><div class="b-mark">●</div><div class="b-text"><code>status</code> = <span class="hi-err">ERROR</span> 让这条 span(及整条 trace)被重点保留 —— 后面采样会用到。</div></div>
+                    <div class="bullet"><div class="b-mark">⚡</div><div class="b-text"><code>events</code> 里挂着 exception 堆栈等"时刻点"。</div></div>
+                </div>
+                <div class="banner reveal" style="font-size:var(--tiny-size)">
+                    <div class="b-title">// 注意</div>
+                    上面是 Node 控制台示例,字段是 <strong>OTel 通用</strong>的;我们 demo 里 Go 服务的 span 字段<strong>一模一样</strong>。
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P05 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P06 · Context Propagation
+     =========================================== -->
+<section class="slide" data-title="跨服务串联">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">concept</span> · 凭什么 4 个服务能拼成一条 trace</div>
+        <div class="ts">06 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">PROPAGATION</span>
+            <h2>traceId 顺着 HTTP header 往下游传</h2>
+        </div>
+
+        <div class="topology reveal flex-1">
+            <svg viewBox="0 0 900 250" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                        <path d="M0,0 L10,5 L0,10 Z" fill="#58a6ff"/>
+                    </marker>
+                </defs>
+                <rect class="node-box accent" x="60" y="80" width="160" height="90"/>
+                <text class="node-label" x="140" y="115" text-anchor="middle" fill="#58a6ff">service-a</text>
+                <text class="node-sub" x="140" y="138" text-anchor="middle">开 root span</text>
+                <text class="node-sub" x="140" y="154" text-anchor="middle">注入 header</text>
+
+                <rect class="node-box accent" x="380" y="80" width="160" height="90"/>
+                <text class="node-label" x="460" y="115" text-anchor="middle" fill="#58a6ff">service-b</text>
+                <text class="node-sub" x="460" y="138" text-anchor="middle">读出 header</text>
+                <text class="node-sub" x="460" y="154" text-anchor="middle">续上 child span</text>
+
+                <rect class="node-box" x="700" y="80" width="140" height="90"/>
+                <text class="node-label" x="770" y="120" text-anchor="middle">下游 c/d</text>
+                <text class="node-sub" x="770" y="142" text-anchor="middle">继续往下传</text>
+
+                <path class="link" d="M 220 125 L 375 125" marker-end="url(#arr2)"/>
+                <text x="297" y="108" font-family="JetBrains Mono" font-size="11" fill="#58a6ff" text-anchor="middle">traceparent:</text>
+                <text x="297" y="148" font-family="JetBrains Mono" font-size="10" fill="#8b949e" text-anchor="middle">00-7fcccd0a..-e1c2..-01</text>
+
+                <path class="link" d="M 540 125 L 695 125" marker-end="url(#arr2)"/>
+                <text x="617" y="112" font-family="JetBrains Mono" font-size="10" fill="#58a6ff" text-anchor="middle">同一个 traceId</text>
+
+                <text x="60" y="210" font-family="JetBrains Mono" font-size="11" fill="#3fb950">✓ 因为 traceId 一路没变,后端才能把这些 span 归到同一棵树</text>
+            </svg>
+        </div>
+
+        <div class="bullets reveal">
+            <div class="bullet"><div class="b-mark">▸</div><div class="b-text">标准叫 <strong>W3C Trace Context</strong>,那个 header 就是 <code class="hi-accent">traceparent</code> —— 所有现代 SDK 默认认它。</div></div>
+            <div class="bullet"><div class="b-mark">▸</div><div class="b-text"><span class="q">反问:如果中间某个服务把 header 弄丢了?</span> 答:从那一跳起<span class="hi-err">断链</span>,会冒出一条新 trace,根因就拼不全了。</div></div>
+            <div class="bullet"><div class="b-mark">▸</div><div class="b-text">我们 demo 里 Traefik 网关的 access log 也记了这个 <code>TraceId</code>,拿着它能直接跳进 Jaeger。</div></div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P06 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P07 · OTel 到底是什么  (啊哈页)
+     =========================================== -->
+<section class="slide" data-title="OTel 是什么">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num" style="color:var(--accent)">★ core</span> · 全场最该记住的一页</div>
+        <div class="ts">07 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">★ OPENTELEMETRY</span>
+            <h2>OTel 是"产数据的标准",不是存数据的后端</h2>
+        </div>
+
+        <div class="banner reveal">
+            <div class="b-title">// 一句话</div>
+            OpenTelemetry = 一套<strong class="hi-accent">规范 + 各语言 SDK + Collector 工具</strong>,厂商中立。它干的事只有一件:<strong>用统一格式,标准化地产出遥测数据(traces/metrics/logs)</strong>。
+        </div>
+
+        <div class="two-col flex-1">
+            <div class="col">
+                <div class="card reveal" style="border-left:3px solid var(--accent)">
+                    <div class="label">OTel 负责 · 产出 & 搬运</div>
+                    <h3>埋点 → 标准化 → 发出去</h3>
+                    <p>SDK 自动产 span;按 <code>OTLP</code> 协议把数据发走。换后端不用改业务代码。</p>
+                </div>
+                <div class="card reveal" style="border-left:3px solid var(--accent-2)">
+                    <div class="label">后端负责 · 存储 & 可视化</div>
+                    <h3>Jaeger / Zipkin / Prometheus / 云</h3>
+                    <p>收下数据,存起来,画成你能查的界面。这些<strong>不是 OTel</strong>,是 OTel 的"消费者"。</p>
+                </div>
+            </div>
+            <div class="col">
+                <div class="banner err reveal">
+                    <div class="b-title">// 最常见的误解</div>
+                    "OTel 是不是又一个 Jaeger / Prometheus?" —— <strong class="hi-err">不是</strong>。
+                    Jaeger 是<strong>后端</strong>,OTel 是<strong>给所有后端供数据的统一上游</strong>。
+                </div>
+                <div class="banner reveal" style="font-size:var(--small-size)">
+                    <div class="b-title">// 它解决的痛</div>
+                    以前换个追踪系统就要把埋点重写一遍。OTel 把"<span class="hi-accent">怎么埋点</span>"和"<span class="hi-purple">用谁来看</span>"<strong>解耦</strong>了:埋一次,后端随便换。
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P07 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P08 · 数据怎么流出去  (架构桥 / OTLP)
+     =========================================== -->
+<section class="slide" data-title="数据怎么流出去">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">architecture</span> · 从 SDK 到后端的全景</div>
+        <div class="ts">08 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">DATA FLOW</span>
+            <h2>SDK → Exporter → OTLP → Collector → 后端</h2>
+        </div>
+
+        <div class="topology reveal flex-1">
+            <svg viewBox="0 0 900 230" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                        <path d="M0,0 L10,5 L0,10 Z" fill="#58a6ff"/>
+                    </marker>
+                </defs>
+                <rect class="node-box accent" x="20" y="80" width="160" height="80"/>
+                <text class="node-label" x="100" y="110" text-anchor="middle" fill="#58a6ff">你的应用</text>
+                <text class="node-sub" x="100" y="130" text-anchor="middle">OTel SDK</text>
+                <text class="node-sub" x="100" y="146" text-anchor="middle">+ Exporter</text>
+
+                <rect class="node-box" x="340" y="80" width="180" height="80"/>
+                <text class="node-label" x="430" y="110" text-anchor="middle">Collector</text>
+                <text class="node-sub" x="430" y="130" text-anchor="middle">接收 / 处理 / 转发</text>
+                <text class="node-sub" x="430" y="146" text-anchor="middle">(下一页详解)</text>
+
+                <rect class="node-box" x="700" y="40" width="170" height="55"/>
+                <text class="node-label" x="785" y="68" text-anchor="middle">Jaeger</text>
+                <text class="node-sub" x="785" y="84" text-anchor="middle">trace 后端</text>
+
+                <rect class="node-box" x="700" y="145" width="170" height="55"/>
+                <text class="node-label" x="785" y="173" text-anchor="middle">Prometheus</text>
+                <text class="node-sub" x="785" y="189" text-anchor="middle">metrics 后端</text>
+
+                <path class="link" d="M 180 120 L 335 120" marker-end="url(#arr3)"/>
+                <text x="257" y="105" font-family="JetBrains Mono" font-size="11" fill="#58a6ff" text-anchor="middle">OTLP</text>
+                <text x="257" y="142" font-family="JetBrains Mono" font-size="9" fill="#8b949e" text-anchor="middle">gRPC :4317 / HTTP :4318</text>
+
+                <path class="link" d="M 520 110 L 695 75" marker-end="url(#arr3)"/>
+                <path class="link" d="M 520 130 L 695 170" marker-end="url(#arr3)"/>
+            </svg>
+        </div>
+
+        <div class="bullets reveal">
+            <div class="bullet"><div class="b-mark">▸</div><div class="b-text"><strong>Exporter</strong> = SDK 里负责"把数据发出去"的组件;默认格式就是 <strong class="hi-accent">OTLP</strong>(OpenTelemetry Protocol)。</div></div>
+            <div class="bullet"><div class="b-mark">▸</div><div class="b-text">OTLP 走 <code>gRPC</code> 或 <code>HTTP</code>;为省网络开销,会 <strong>Batch</strong> 攒一批 span 一起发。</div></div>
+            <div class="bullet"><div class="b-mark">▸</div><div class="b-text">应用其实也能直连后端,但那样每个服务都得各配一遍 —— 所以中间加一个 <strong class="hi-accent">Collector</strong> 统一收。</div></div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P08 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P09 · Collector 是什么 + 四组件 + 部署
+     =========================================== -->
+<section class="slide" data-title="Collector 是什么">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">collector 1/3</span> · 四组件 + 部署形态</div>
+        <div class="ts">09 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">COLLECTOR</span>
+            <h2>一个与厂商无关的"遥测数据中转站"</h2>
+        </div>
+
+        <div class="banner reveal" style="font-size:var(--small-size)">
+            <div class="b-title">// 为什么要它</div>
+            把"<strong>收数据 / 处理数据 / 发去哪</strong>"从每个应用里抽出来,集中到一处管理 —— 应用只管按 OTLP 发给 Collector,采样、改标签、换后端都在 Collector 上调,<strong class="hi-accent">不用动业务代码</strong>。
+        </div>
+
+        <div class="two-col flex-1">
+            <div class="col">
+                <div class="card reveal"><div class="label">① Receiver 接收器</div><p>数据怎么进来(如 <code>otlp</code>)。<strong>至少配一个。</strong></p></div>
+                <div class="card reveal"><div class="label">② Processor 处理器</div><p>中间怎么加工:<code>batch</code> 批处理、<code>tail_sampling</code> 采样、改/删标签。可选但常用。</p></div>
+                <div class="card reveal"><div class="label">③ Exporter 导出器</div><p>数据发去哪(如 <code>otlp/jaeger</code>)。<strong>至少配一个。</strong></p></div>
+                <div class="card reveal"><div class="label">④ Connector / Extension</div><p>连接两条管道 / 健康检查等辅助。入门可先不管。</p></div>
+            </div>
+            <div class="col">
+                <table class="cmp-table reveal">
+                    <thead><tr><th>部署形态</th><th>跑在哪</th><th>适合</th></tr></thead>
+                    <tbody>
+                        <tr><td class="mono">Agent 代理</td><td>和应用同主机<br/>(sidecar / daemonset)</td><td class="verdict-ok">新应用 / K8s</td></tr>
+                        <tr><td class="mono">Gateway 网关</td><td>独立服务,<br/>每集群/区域一组</td><td>已有应用<br/>集中治理</td></tr>
+                    </tbody>
+                </table>
+                <div class="banner warn reveal" style="font-size:var(--tiny-size)">
+                    <div class="b-title">// 关键规则(下一页验证)</div>
+                    配了组件 <strong>≠</strong> 启用。必须在 <code>service.pipelines</code> 里<strong>引用</strong>,它才真正生效。
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P09 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P10 · 走查真实配置
+     =========================================== -->
+<section class="slide" data-title="走查真实配置">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">collector 2/3</span> · 读懂本项目的 otel/collector.yaml</div>
+        <div class="ts">10 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">CONFIG</span>
+            <h2>三段组件 + 一条 pipeline 把它们串起来</h2>
+            <span class="meta">本仓库真实配置</span>
+        </div>
+
+        <div class="two-col flex-1">
+            <div class="col">
+                <div class="code reveal" style="white-space:pre-wrap;flex:1"><span class="lang">otel/collector.yaml</span><span class="kw">receivers</span>:
+  <span class="fn">otlp</span>:
+    protocols:
+      grpc: { endpoint: <span class="str">0.0.0.0:4317</span> }   <span class="com"># Go 服务上报入口</span>
+      http: { endpoint: <span class="str">0.0.0.0:4318</span> }
+
+<span class="kw">processors</span>:
+  <span class="fn">tail_sampling</span>: { ... }      <span class="com"># 见下一页</span>
+  <span class="fn">batch</span>: { timeout: <span class="num">2s</span> }
+
+<span class="kw">exporters</span>:
+  <span class="fn">otlp/jaeger</span>: { endpoint: <span class="str">jaeger:4317</span> }
+  <span class="fn">debug</span>: { verbosity: <span class="str">basic</span> }
+
+<span class="kw">service</span>:
+  pipelines:
+    <span class="typ">traces</span>:
+      receivers:  [<span class="fn">otlp</span>]
+      processors: [<span class="fn">tail_sampling</span>, <span class="fn">batch</span>]
+      exporters:  [<span class="fn">otlp/jaeger</span>, <span class="fn">debug</span>]</div>
+            </div>
+            <div class="col">
+                <div class="bullets reveal">
+                    <div class="bullet"><div class="b-mark">in</div><div class="b-text"><strong>receivers.otlp</strong> 开了 4317(gRPC)和 4318(HTTP)两个口子收数据。</div></div>
+                    <div class="bullet"><div class="b-mark">mid</div><div class="b-text"><strong>processors</strong> 先采样、再批处理(细节下一页)。</div></div>
+                    <div class="bullet"><div class="b-mark">out</div><div class="b-text"><strong>exporters</strong> 一份发 Jaeger,一份打到 Collector 日志方便调试。</div></div>
+                    <div class="bullet"><div class="b-mark">★</div><div class="b-text"><strong class="hi-accent">service.pipelines.traces</strong> 才是开关:把上面三段<strong>引用</strong>进来,组件才真正上线。</div></div>
+                </div>
+                <div class="banner warn reveal" style="font-size:var(--tiny-size)">
+                    <div class="b-title">// 顺序有讲究</div>
+                    processors 是<strong>有序</strong>的:<code>tail_sampling</code> 必须排在 <code>batch</code> <strong>前面</strong>,否则采样决策可能不对。
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P10 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P11 · Processor 重点:采样
+     =========================================== -->
+<section class="slide" data-title="尾部采样">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">collector 3/3</span> · tail_sampling · 留该留的</div>
+        <div class="ts">11 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">SAMPLING</span>
+            <h2>错误 / 慢 100% 留,正常只留 1%</h2>
+            <span class="meta">tail_sampling</span>
+        </div>
+
+        <div class="sampling-stage flex-1 reveal">
+            <div class="sampling-legend">
+                <div class="lg"><div class="swatch kept-err"></div><div>5xx / ERROR · <span class="hi-err">必留</span></div></div>
+                <div class="lg"><div class="swatch kept-warn"></div><div>慢 &gt;3s · <span class="hi-warn">必留</span></div></div>
+                <div class="lg"><div class="swatch kept"></div><div>正常 · <span class="hi-accent">~1%</span></div></div>
+                <div class="lg"><div class="swatch drop"></div><div>正常 · 丢弃</div></div>
+                <div class="mono" style="margin-top:0.6rem;font-size:var(--tiny-size);color:var(--text-dim);line-height:1.7">
+                    <span class="hi-accent">总数: 100</span><br/>
+                    保留: <span class="hi-accent">3</span><br/>
+                    丢弃: <span class="dim">97</span><br/>
+                    <span class="hi-ok">→ 关键 trace 0 丢失</span>
+                </div>
+            </div>
+            <div class="sampling-grid" id="samplingGrid"><!-- JS 生成 --></div>
+        </div>
+
+        <div class="banner reveal" style="font-size:var(--tiny-size);margin-top:0.5rem">
+            <div class="b-title">// 为什么是"尾部"采样</div>
+            <strong>tail</strong> = 等整条 trace 的 span 基本到齐,再回头看"它出错了吗 / 它慢吗",然后决定留不留。
+            如果在 SDK 端按 1% 概率瞎丢,一条 error 也只有 1% 概率被留下 → <strong class="hi-err">99% 丢失关键证据</strong>;尾采样把它翻成 <strong class="hi-ok">100% 留</strong>。
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P11 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P12 · 怎么接入:自动埋点
+     =========================================== -->
+<section class="slide" data-title="自动埋点">
+    <header class="chrome">
+        <div class="dots"><span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span></div>
+        <div class="label"><span class="step-num">how</span> · 接入几乎不改业务代码</div>
+        <div class="ts">12 / 13</div>
+    </header>
+    <div class="slide-content">
+        <div class="panel-title reveal">
+            <span class="step-pill">INSTRUMENT</span>
+            <h2>自动埋点 + 给服务起个名字</h2>
+        </div>
+
+        <div class="two-col flex-1">
+            <div class="col">
+                <div class="card reveal" style="border-left:3px solid var(--accent)">
+                    <div class="label">自动埋点 auto-instrumentation</div>
+                    <h3>装上 SDK,常见框架自动产 span</h3>
+                    <p>HTTP 框架、数据库、Redis 这些调用,SDK 自动包好,<strong>不用你在业务里手写 span</strong>。本 demo 的 4 个 Go 服务就是这么接的。</p>
+                </div>
+                <div class="banner reveal" style="font-size:var(--small-size)">
+                    <div class="b-title">// 什么时候才需要手动埋点</div>
+                    只有"框架看不见的业务关键步骤"才手写一根 span 补上 —— 入门阶段先不碰。
+                </div>
+            </div>
+            <div class="col">
+                <div class="banner warn reveal" style="font-size:var(--small-size)">
+                    <div class="b-title">// 必做的一件事:service.name</div>
+                    不配的话后端里显示成 <span class="tag-old">unknown_service</span>,几十个服务全分不清谁是谁。
+                </div>
+                <div class="code reveal" style="white-space:pre-wrap;flex:1"><span class="lang">config.yaml</span><span class="kw">otel</span>:
+  <span class="fn">service_name</span>: <span class="str">service-a</span>   <span class="com"># ← 后端里就按它分组</span>
+  <span class="fn">endpoint</span>:     <span class="str">otel-collector:4317</span>
+  <span class="fn">insecure</span>:     <span class="kw">true</span>
+
+<span class="com"># 配好后,Jaeger 左侧服务列表里</span>
+<span class="com"># 就能直接选 service-a / b / c / d</span></div>
+            </div>
+        </div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P12 ·</div>
+    </div>
+</section>
+
+<!-- ===========================================
+     P13 · 收尾 + 预告
+     =========================================== -->
+<section class="slide closing" data-title="收尾">
+    <div class="content">
+        <div class="glyph reveal">trace → span → SDK → OTLP → Collector → Jaeger</div>
+        <h2 class="reveal">这就是 OpenTelemetry 的全貌</h2>
+        <div class="sub reveal dim" style="font-family:var(--font-mono);margin-top:0.6rem">
+            应用埋点产 span,SDK 按 OTLP 发给 Collector,Collector 采样后转给后端,你用 traceId 还原现场。
+        </div>
+        <div class="hook reveal">下一场 · 真跑一遍 demo:点一个 5xx → 拿 TraceId → 在 Jaeger 里定位根因</div>
+    </div>
+    <div class="foot">
+        <div class="left">otel-101 · go-otel-demo</div>
+        <div class="right">· P13 ·</div>
+    </div>
+</section>
+<!-- Image lightbox (click any screenshot to zoom) -->
+<div class="lightbox" id="lightbox" aria-hidden="true">
+    <div class="lb-hint">滚轮缩放 · 拖动平移 · Esc 关闭</div>
+    <button class="lb-close" id="lbClose" aria-label="关闭">✕</button>
+    <img id="lbImg" src="" alt="" draggable="false"/>
+    <div class="lb-controls">
+        <button id="lbOut" aria-label="缩小">−</button>
+        <span class="lb-zoom" id="lbZoom">100%</span>
+        <button id="lbIn" aria-label="放大">+</button>
+        <button id="lbReset" aria-label="重置 100%">⟳</button>
+    </div>
+</div>
+
+<script>
+/* ===========================================
+   SLIDE PRESENTATION CONTROLLER
+   - keyboard / wheel / touch nav
+   - intersection observer for .visible class
+   - progress bar + nav dots
+   =========================================== */
+class SlidePresentation {
+    constructor() {
+        this.slides = Array.from(document.querySelectorAll('.slide'));
+        this.current = 0;
+        this.progressBar = document.querySelector('.progress-bar');
+        this.navDotsContainer = document.querySelector('.nav-dots');
+        this.setupObserver();
+        this.setupNavDots();
+        this.setupKeyboard();
+        this.setupWheel();
+        this.setupTouch();
+        this.setupSamplingGrid();
+        this.updateProgress();
+    }
+
+    setupObserver() {
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach(e => {
+                if (e.isIntersecting && e.intersectionRatio > 0.5) {
+                    e.target.classList.add('visible');
+                    this.current = this.slides.indexOf(e.target);
+                    this.updateProgress();
+                    this.updateNavDots();
+                }
+            });
+        }, { threshold: [0.5] });
+        this.slides.forEach(s => io.observe(s));
+    }
+
+    setupNavDots() {
+        // Clear first to avoid duplicates on re-open
+        this.navDotsContainer.innerHTML = '';
+        this.slides.forEach((s, i) => {
+            const btn = document.createElement('button');
+            btn.setAttribute('aria-label', `Slide ${i+1}`);
+            btn.addEventListener('click', () => this.scrollTo(i));
+            this.navDotsContainer.appendChild(btn);
+        });
+    }
+
+    updateNavDots() {
+        Array.from(this.navDotsContainer.children).forEach((b, i) => {
+            b.classList.toggle('active', i === this.current);
+        });
+    }
+
+    updateProgress() {
+        const pct = ((this.current + 1) / this.slides.length) * 100;
+        this.progressBar.style.width = pct + '%';
+    }
+
+    scrollTo(i) {
+        const target = this.slides[Math.max(0, Math.min(i, this.slides.length - 1))];
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    setupKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            if (window.__lightboxOpen && window.__lightboxOpen()) return;
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+                e.preventDefault();
+                this.scrollTo(this.current + 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'PageUp') {
+                e.preventDefault();
+                this.scrollTo(this.current - 1);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                this.scrollTo(0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                this.scrollTo(this.slides.length - 1);
+            }
+        });
+    }
+
+    setupWheel() {
+        // Throttle wheel so one detent = one slide
+        let last = 0;
+        window.addEventListener('wheel', (e) => {
+            if (window.__lightboxOpen && window.__lightboxOpen()) return;
+            const now = Date.now();
+            if (now - last < 700) return;
+            if (Math.abs(e.deltaY) < 30) return;
+            last = now;
+            this.scrollTo(this.current + (e.deltaY > 0 ? 1 : -1));
+        }, { passive: true });
+    }
+
+    setupTouch() {
+        let startY = 0;
+        window.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        window.addEventListener('touchend', (e) => {
+            const dy = e.changedTouches[0].clientY - startY;
+            if (Math.abs(dy) < 50) return;
+            this.scrollTo(this.current + (dy < 0 ? 1 : -1));
+        }, { passive: true });
+    }
+
+    /* P12 sampling grid: 102 cells = 99 dropped + 1 normal kept + 1 error + 1 slow */
+    setupSamplingGrid() {
+        const grid = document.getElementById('samplingGrid');
+        if (!grid) return;
+        const total = 100;
+        // Pick deterministic positions for kept cells
+        const errIdx  = 37; // error
+        const warnIdx = 71; // slow
+        const keepIdx = 12; // normal kept (the lucky 1%)
+        for (let i = 0; i < total; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            if (i === errIdx) cell.classList.add('kept-err');
+            else if (i === warnIdx) cell.classList.add('kept-warn');
+            else if (i === keepIdx) cell.classList.add('kept');
+            grid.appendChild(cell);
+        }
+    }
+}
+
+/* ===========================================
+   IMAGE LIGHTBOX CONTROLLER
+   - click a screenshot to open
+   - +/- buttons, wheel zoom, drag-to-pan, Esc/backdrop close
+   =========================================== */
+function initLightbox() {
+    const lb = document.getElementById('lightbox');
+    if (!lb) return;
+    const img = document.getElementById('lbImg');
+    const zoomLabel = document.getElementById('lbZoom');
+    let scale = 1, tx = 0, ty = 0, drag = null;
+
+    const apply = () => {
+        img.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+        zoomLabel.textContent = Math.round(scale * 100) + '%';
+    };
+    const reset = () => { scale = 1; tx = 0; ty = 0; apply(); };
+    const zoom = (d) => {
+        scale = Math.min(6, Math.max(1, +(scale + d).toFixed(2)));
+        if (scale === 1) { tx = 0; ty = 0; }
+        apply();
+    };
+    const open = (src, alt) => {
+        img.src = src; img.alt = alt || ''; reset();
+        lb.classList.add('open'); lb.setAttribute('aria-hidden', 'false');
+    };
+    const close = () => {
+        lb.classList.remove('open'); lb.setAttribute('aria-hidden', 'true'); img.src = '';
+    };
+
+    document.querySelectorAll('.shot-frame img').forEach(im => {
+        im.addEventListener('click', () => open(im.currentSrc || im.src, im.alt));
+    });
+    document.getElementById('lbIn').addEventListener('click', e => { e.stopPropagation(); zoom(0.25); });
+    document.getElementById('lbOut').addEventListener('click', e => { e.stopPropagation(); zoom(-0.25); });
+    document.getElementById('lbReset').addEventListener('click', e => { e.stopPropagation(); reset(); });
+    document.getElementById('lbClose').addEventListener('click', e => { e.stopPropagation(); close(); });
+    lb.addEventListener('click', e => { if (e.target === lb) close(); });
+
+    lb.addEventListener('wheel', e => {
+        if (!lb.classList.contains('open')) return;
+        e.preventDefault();
+        zoom(e.deltaY < 0 ? 0.2 : -0.2);
+    }, { passive: false });
+
+    img.addEventListener('mousedown', e => {
+        if (scale <= 1) return;
+        e.preventDefault();
+        drag = { x: e.clientX - tx, y: e.clientY - ty };
+        img.classList.add('grabbing');
+    });
+    window.addEventListener('mousemove', e => {
+        if (!drag) return;
+        tx = e.clientX - drag.x; ty = e.clientY - drag.y; apply();
+    });
+    window.addEventListener('mouseup', () => {
+        if (drag) { drag = null; img.classList.remove('grabbing'); }
+    });
+
+    document.addEventListener('keydown', e => {
+        if (!lb.classList.contains('open')) return;
+        if (e.key === 'Escape') { e.stopPropagation(); close(); }
+        else if (e.key === '+' || e.key === '=') { e.preventDefault(); zoom(0.25); }
+        else if (e.key === '-' || e.key === '_') { e.preventDefault(); zoom(-0.25); }
+    }, true);
+
+    window.__lightboxOpen = () => lb.classList.contains('open');
+}
+
+document.addEventListener('DOMContentLoaded', () => { new SlidePresentation(); initLightbox(); });
+</script>
+</body>
+</html>

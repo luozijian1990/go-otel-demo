@@ -1,0 +1,129 @@
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "4317"
+      - "4318"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      - jaeger
+
+  traefik:
+    image: traefik:v3.4
+    volumes:
+      - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro
+      - ./traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
+      - ./logs/traefik:/logs
+    ports:
+      - "18086:80"
+      - "18082:8080"
+    depends_on:
+      - otel-collector
+      - service-a
+      - service-b
+      - service-c
+      - service-d
+
+  demo-ui:
+    image: nginx:alpine
+    volumes:
+      - ./web/index.html:/usr/share/nginx/html/index.html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "18083:80"
+    # nginx.conf references upstream `traefik`, so traefik must exist
+    # in the docker network before nginx starts (it tries to resolve
+    # the upstream at boot, not lazily). traefik does NOT need demo-ui
+    # to be up — it routes /ui via static config — so this dependency
+    # is purely one-way.
+    depends_on:
+      - traefik
+
+  # All 4 Go services build with loongsuite-go-agent (otel go build) and rely
+  # on the OTEL_* env vars below for SDK bootstrap (mode B — no observability.Init
+  # in application code). See docs/plans/2026-05-19-roll-out-otel-auto-tasks.md
+  # for the rollout rationale; see docs/observations/2026-05-18-otel-auto-findings.md
+  # for the experimental validation.
+
+  service-a:
+    build: ./service-a
+    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+    stop_grace_period: 15s
+    volumes:
+      - ./service-a/config.yaml:/etc/go-otel-demo/config.yaml:ro
+    environment:
+      - OTEL_SERVICE_NAME=service-a
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_TRACES_SAMPLER=parentbased_always_on
+      - OTEL_PROPAGATORS=tracecontext,baggage
+    ports:
+      - "18080:8080"
+    depends_on:
+      - otel-collector
+
+  service-b:
+    build: ./service-b
+    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+    stop_grace_period: 15s
+    volumes:
+      - ./service-b/config.yaml:/etc/go-otel-demo/config.yaml:ro
+    environment:
+      - OTEL_SERVICE_NAME=service-b
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_TRACES_SAMPLER=parentbased_always_on
+      - OTEL_PROPAGATORS=tracecontext,baggage
+    ports:
+      - "18081:8080"
+    depends_on:
+      - otel-collector
+
+  service-c:
+    build: ./service-c
+    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+    stop_grace_period: 15s
+    volumes:
+      - ./service-c/config.yaml:/etc/go-otel-demo/config.yaml:ro
+    environment:
+      - OTEL_SERVICE_NAME=service-c
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_TRACES_SAMPLER=parentbased_always_on
+      - OTEL_PROPAGATORS=tracecontext,baggage
+    ports:
+      - "18084:8080"
+    depends_on:
+      - otel-collector
+
+  service-d:
+    build: ./service-d
+    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+    stop_grace_period: 15s
+    volumes:
+      - ./service-d/config.yaml:/etc/go-otel-demo/config.yaml:ro
+    environment:
+      - OTEL_SERVICE_NAME=service-d
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_INSECURE=true
+      - OTEL_TRACES_SAMPLER=parentbased_always_on
+      - OTEL_PROPAGATORS=tracecontext,baggage
+    ports:
+      - "18085:8080"
+    depends_on:
+      - otel-collector

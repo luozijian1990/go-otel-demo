@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Go OTel Demo Console</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f5f8; --panel: #fcfdff; --panel-soft: #edf1f6;
+      --border: #d7dfe9; --text: #202b3d; --muted: #58677d;
+      --primary: #245ac5; --primary-hover: #194ba9; --selected: #e9f0ff;
+      --danger: #b12e3e; --danger-bg: #fceef0; --warning: #8a590b;
+      --warning-bg: #faf2e1; --success: #246c4a; --success-bg: #eaf5ef;
+      --code-bg: #f6f8fb; --code-text: #344763;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111720; --panel: #18212d; --panel-soft: #202c3b;
+        --border: #334255; --text: #e3eaf5; --muted: #a6b5ca;
+        --primary: #9abaff; --primary-hover: #c0d3ff; --selected: #263b5a;
+        --danger: #ffa7b2; --danger-bg: #422933; --warning: #eec37f;
+        --warning-bg: #3b3225; --success: #8ad5ad; --success-bg: #233b33;
+        --code-bg: #141c27; --code-text: #c0d1e9;
+      }
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button, .button-link { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 36px; padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); font: inherit; text-decoration: none; cursor: pointer; white-space: nowrap; }
+    button:hover:not(:disabled), .button-link:hover { color: var(--primary); border-color: var(--primary); background: var(--selected); }
+    button:active:not(:disabled), .button-link:active { transform: translateY(1px); }
+    :focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+    button:disabled { cursor: not-allowed; opacity: .6; }
+    .shell { max-width: 1440px; margin: auto; padding: 0 40px 32px; }
+    .topbar { min-height: 80px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--border); }
+    .brand { display: flex; gap: 12px; align-items: center; }
+    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 6px; background: var(--text); color: var(--panel); font: 700 15px var(--mono); }
+    h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -.4px; }
+    .link-row { display: flex; gap: 8px; }
+    .intro { padding: 30px 0 24px; }
+    .intro h2 { font-size: 28px; letter-spacing: -.8px; line-height: 1.3; margin: 0 0 8px; font-weight: 650; }
+    .subtitle { margin: 0; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: minmax(340px, .85fr) minmax(0, 1.4fr); gap: 24px; align-items: start; }
+    .card { min-width: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    .card-header { min-height: 62px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--border); }
+    .card-title { margin: 0; font-size: 15px; font-weight: 650; }
+    .card-body { padding: 20px; }
+    .scenario-group + .scenario-group { margin-top: 22px; }
+    .group-title { margin: 0 0 9px; display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted); }
+    .group-title span { font: 11px var(--mono); }
+    .button-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+    .button-grid button { min-width: 0; min-height: 60px; padding: 10px 12px; align-items: flex-start; flex-direction: column; gap: 2px; text-align: left; white-space: normal; }
+    .scenario-label { font-size: 12px; font-weight: 600; }
+    .scenario-path { font: 10px/1.6 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+    .button-grid button[aria-pressed="true"] { border-color: var(--primary); background: var(--selected); box-shadow: inset 3px 0 var(--primary); }
+    .danger .scenario-label { color: var(--danger); }
+    .warning .scenario-label { color: var(--warning); }
+    .tag { display: inline-flex; align-items: center; border-radius: 4px; padding: 3px 8px; background: var(--panel-soft); color: var(--muted); font: 11px/1.6 var(--mono); white-space: nowrap; }
+    .tag.success { color: var(--success); background: var(--success-bg); }
+    .tag.error { color: var(--danger); background: var(--danger-bg); }
+    .tag.warning { color: var(--warning); background: var(--warning-bg); }
+    .result-column { min-width: 0; position: sticky; top: 24px; }
+    .result-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 0 22px; }
+    .meta-label { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+    .meta-value { font: 13px/1.6 var(--mono); overflow-wrap: anywhere; }
+    #result-status, #result-elapsed { font-size: 22px; letter-spacing: -.6px; }
+    .trace-row { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 16px 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .trace-row > div:first-child { min-width: 0; }
+    .trace-id { font: 12px/1.6 var(--mono); overflow-wrap: anywhere; }
+    .trace-actions { display: flex; gap: 6px; }
+    .trace-actions button, .trace-actions a { font-size: 12px; }
+    .body-heading { display: flex; justify-content: space-between; align-items: center; margin: 18px 0 10px; font-size: 12px; font-weight: 600; }
+    .body-heading span { color: var(--muted); font: 10px var(--mono); }
+    pre { margin: 0; min-height: 250px; max-height: 440px; overflow: auto; background: var(--code-bg); color: var(--code-text); border: 1px solid var(--border); border-radius: 6px; padding: 18px; font: 12px/1.85 var(--mono); tab-size: 2; }
+    .empty { min-height: 404px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 30px; }
+    .empty-mark { font: 32px var(--mono); color: var(--primary); margin-bottom: 20px; }
+    .empty h3 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+    .empty p { color: var(--muted); max-width: 32ch; margin: 0; line-height: 1.9; }
+    .empty code { color: var(--text); font-family: var(--mono); }
+    .sampling-note { margin: 20px 0 0; padding: 16px 20px; border-left: 2px solid var(--primary); background: var(--panel-soft); border-radius: 0 6px 6px 0; font-size: 12px; color: var(--muted); }
+    .sampling-note strong { color: var(--text); display: block; margin-bottom: 5px; font-weight: 600; }
+    .sampling-note p { margin: 0; }
+    .footnote { margin: 24px 0 0; font-size: 11px; color: var(--muted); }
+    #copy-feedback { min-height: 18px; color: var(--muted); font-size: 11px; margin-top: 6px; }
+    .loading-lines { padding: 25px 18px; min-height: 250px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; }
+    .loading-lines span { display: block; width: 70%; height: 10px; margin-bottom: 18px; border-radius: 4px; background: var(--border); }
+    .loading-lines span:nth-child(2) { width: 45%; }
+    .loading-lines span:nth-child(3) { width: 58%; }
+    @media (max-width: 1024px) { .shell { padding: 0 24px 24px; } .grid { gap: 16px; grid-template-columns: minmax(310px, .9fr) minmax(0, 1.2fr); } .card-body, .card-header { padding: 16px; } }
+    @media (max-width: 767px) { .shell { padding: 0 16px 24px; } .topbar { gap: 12px; min-height: 72px; } h1 { font-size: 13px; } .brand { gap: 8px; } .brand-mark { display: none; } .link-row { gap: 5px; } .link-row a { padding: 6px 8px; font-size: 11px; } .intro { padding: 24px 0 20px; } .intro h2 { font-size: 25px; } .subtitle { font-size: 12px; } .grid { grid-template-columns: 1fr; } .result-column { position: static; } .empty { min-height: 240px; } .button-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .trace-row { align-items: flex-start; flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">ot</span><h1>Go OTel Demo Console</h1></div>
+      <div class="link-row">
+        <a class="button-link" href="http://localhost:16686" target="_blank" rel="noreferrer">Jaeger</a>
+        <a class="button-link" href="http://localhost:18082/dashboard/" target="_blank" rel="noreferrer">Traefik</a>
+      </div>
+    </section>
+
+    <section class="intro">
+      <h2>从一次请求，追踪整条链路。</h2>
+      <p class="subtitle">触发成功、故障与慢请求，查看响应并在 Jaeger 中定位原因。</p>
+    </section>
+    <section class="grid" aria-label="链路实验操作台">
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">请求场景</h2>
+          <span class="tag">GET /service-a</span>
+        </div>
+        <div class="card-body" id="scenario-root"></div>
+      </div>
+
+      <div class="result-column">
+      <div class="card result-card">
+        <div class="card-header">
+          <h2 class="card-title">响应结果</h2>
+          <span class="tag" id="status-tag" role="status">等待请求</span>
+        </div>
+        <div class="card-body">
+          <div id="empty-state" class="empty"><div class="empty-mark" aria-hidden="true">{ }</div><h3>等待第一条请求</h3><p>选择一个场景，即可查看状态码、耗时和完整响应。<br>建议从 <code>Error 5xx</code> 开始验证。</p></div>
+          <div id="result-state" hidden>
+            <div class="result-meta">
+              <div class="meta-item">
+                <div class="meta-label">请求路径</div>
+                <div class="meta-value" id="result-path">-</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">请求耗时</div>
+                <div class="meta-value" id="result-elapsed">-</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">HTTP 状态码</div>
+                <div class="meta-value" id="result-status">-</div>
+              </div>
+              <div class="meta-item">
+                <div class="meta-label">Trace 来源</div>
+                <div class="meta-value" id="result-trace-source">-</div>
+              </div>
+            </div>
+            <div class="trace-row">
+              <div>
+                <div class="meta-label">trace id</div>
+                <div class="trace-id" id="trace-id">-</div>
+              </div>
+              <div class="trace-actions">
+                <button type="button" id="copy-trace">复制 TraceId</button>
+                <a class="button-link" id="jaeger-link" href="http://localhost:16686" target="_blank" rel="noreferrer">查看链路</a>
+              </div>
+            </div>
+            <div id="copy-feedback" role="status"></div>
+            <div class="body-heading">响应内容 <span>RESPONSE BODY</span></div>
+            <div class="loading-lines" id="loading-state" hidden aria-label="正在等待响应"><span></span><span></span><span></span></div>
+            <pre id="response-body" tabindex="0" aria-label="响应内容"></pre>
+          </div>
+        </div>
+      </div>
+      <aside class="sampling-note"><strong>有 TraceId，不一定能查到链路</strong><p>普通成功请求约保留 1%；5xx、ERROR span 与超过 3 秒的慢请求保留 100%。采样等待 10 秒，完成后稍等再打开 Jaeger。</p></aside>
+      </div>
+    </section>
+    <p class="footnote">请求入口 /service-a，通过 Traefik 同源转发。HTTP 200 的降级请求也可能包含 ERROR span。</p>
+  </main>
+
+  <script>
+    const groups = [
+      {
+        title: '基础请求',
+        items: [
+          { label: 'OK', path: '/ok', tone: 'primary' },
+          { label: 'Error 5xx', path: '/error', tone: 'danger' },
+          { label: 'Slow 5s', path: '/slow', tone: 'warning' }
+        ]
+      },
+      {
+        title: '依赖请求',
+        items: [
+          { label: 'MySQL OK', path: '/mysql/ok' },
+          { label: 'MySQL Error', path: '/mysql/error', tone: 'danger' },
+          { label: 'Redis OK', path: '/redis/ok' },
+          { label: 'Redis Error', path: '/redis/error', tone: 'danger' },
+          { label: 'RabbitMQ OK', path: '/rabbitmq/ok' },
+          { label: 'RabbitMQ Error', path: '/rabbitmq/error', tone: 'danger' }
+        ]
+      },
+      {
+        title: '组合请求',
+        items: [
+          { label: 'Call OK', path: '/call/ok' },
+          { label: 'Call Error', path: '/call/error', tone: 'danger' },
+          { label: 'Call Slow', path: '/call/slow', tone: 'warning' },
+          { label: 'Full OK', path: '/full/ok' },
+          { label: 'Full Error', path: '/full/error', tone: 'danger' }
+        ]
+      },
+      {
+        title: '复杂链路',
+        items: [
+          { label: 'Chain Redis OK', path: '/chain/redis/ok' },
+          { label: 'Chain MySQL Error', path: '/chain/mysql/error', tone: 'danger' },
+          { label: 'Chain Fanout OK', path: '/chain/fanout/ok' },
+          { label: 'Chain Fanout Error', path: '/chain/fanout/error', tone: 'danger' },
+          { label: 'Chain Slow Redis', path: '/chain/slow/redis', tone: 'warning' },
+          { label: 'Chain Degrade OK', path: '/chain/degrade/ok', tone: 'warning' }
+        ]
+      }
+    ];
+
+    const basePath = '/service-a';
+    const scenarioRoot = document.getElementById('scenario-root');
+    const emptyState = document.getElementById('empty-state');
+    const resultState = document.getElementById('result-state');
+    const statusTag = document.getElementById('status-tag');
+    const resultPath = document.getElementById('result-path');
+    const resultElapsed = document.getElementById('result-elapsed');
+    const resultStatus = document.getElementById('result-status');
+    const resultTraceSource = document.getElementById('result-trace-source');
+    const traceIdEl = document.getElementById('trace-id');
+    const responseBody = document.getElementById('response-body');
+    const jaegerLink = document.getElementById('jaeger-link');
+    const copyTrace = document.getElementById('copy-trace');
+
+    function renderScenarios() {
+      scenarioRoot.innerHTML = '';
+      for (const group of groups) {
+        const section = document.createElement('section');
+        section.className = 'scenario-group';
+
+        const title = document.createElement('h3');
+        title.className = 'group-title';
+        title.textContent = group.title;
+        const count = document.createElement('span');
+        count.textContent = String(group.items.length).padStart(2, '0');
+        title.appendChild(count);
+        section.appendChild(title);
+
+        const grid = document.createElement('div');
+        grid.className = 'button-grid';
+        for (const item of group.items) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          const label = document.createElement('span');
+          label.className = 'scenario-label';
+          label.textContent = item.label;
+          const path = document.createElement('span');
+          path.className = 'scenario-path';
+          path.textContent = item.path;
+          button.append(label, path);
+          button.setAttribute('aria-pressed', 'false');
+          button.dataset.path = item.path;
+          if (item.tone) {
+            button.classList.add(item.tone);
+          }
+          button.addEventListener('click', () => runScenario(item));
+          grid.appendChild(button);
+        }
+        section.appendChild(grid);
+        scenarioRoot.appendChild(section);
+      }
+    }
+
+    async function runScenario(item) {
+      const url = `${basePath}${item.path}`;
+      const started = performance.now();
+      setLoading(item.path);
+      if (window.matchMedia('(max-width: 767px)').matches) {
+        document.querySelector('.result-column').scrollIntoView({ block: 'start' });
+      }
+
+      let status = 0;
+      let text = '';
+      let traceId = '';
+      let traceSource = '-';
+
+      try {
+        const response = await fetch(url, { method: 'GET' });
+        status = response.status;
+        traceId = response.headers.get('X-Trace-Id') || '';
+        if (traceId) {
+          traceSource = 'X-Trace-Id';
+        }
+        text = await response.text();
+      } catch (error) {
+        text = JSON.stringify({ error: error.message }, null, 2);
+      }
+
+      const elapsed = performance.now() - started;
+      const parsed = parseJSON(text);
+      if (parsed && parsed.trace_id) {
+        traceId = parsed.trace_id;
+        traceSource = 'response.trace_id';
+      }
+      renderResult({
+        path: item.path,
+        status,
+        elapsed,
+        traceId,
+        traceSource,
+        body: parsed ?? text
+      });
+    }
+
+    function setLoading(path) {
+      for (const button of document.querySelectorAll('button[data-path]')) {
+        button.disabled = true;
+        button.setAttribute('aria-pressed', String(button.dataset.path === path));
+      }
+      emptyState.hidden = true;
+      resultState.hidden = false;
+      statusTag.textContent = '请求中';
+      resultState.setAttribute('aria-busy', 'true');
+      document.getElementById('copy-feedback').textContent = '';
+      copyTrace.textContent = '复制 TraceId';
+      document.getElementById('loading-state').hidden = false;
+      responseBody.hidden = true;
+      statusTag.className = 'tag warning';
+      resultPath.textContent = path;
+      resultElapsed.textContent = '-';
+      resultStatus.textContent = '-';
+      resultTraceSource.textContent = '-';
+      traceIdEl.textContent = '-';
+      responseBody.textContent = '';
+      jaegerLink.hidden = true;
+      jaegerLink.href = 'http://localhost:16686';
+      copyTrace.disabled = true;
+    }
+
+    function renderResult(result) {
+      for (const button of document.querySelectorAll('button[data-path]')) {
+        button.disabled = false;
+      }
+
+      resultState.setAttribute('aria-busy', 'false');
+      document.getElementById('loading-state').hidden = true;
+      responseBody.hidden = false;
+      const ok = result.status >= 200 && result.status < 300;
+      statusTag.textContent = result.status ? `HTTP ${result.status}` : '网络错误';
+      statusTag.className = ok ? 'tag success' : 'tag error';
+      resultPath.textContent = result.path;
+      resultElapsed.textContent = `${result.elapsed.toFixed(1)}ms`;
+      resultStatus.textContent = result.status || '-';
+      resultTraceSource.textContent = result.traceSource;
+      traceIdEl.textContent = result.traceId || '无 trace id';
+      responseBody.textContent = typeof result.body === 'string'
+        ? result.body
+        : JSON.stringify(result.body, null, 2);
+
+      jaegerLink.hidden = !result.traceId;
+      if (result.traceId) {
+        jaegerLink.href = `http://localhost:16686/trace/${encodeURIComponent(result.traceId)}`;
+        copyTrace.disabled = false;
+      } else {
+        jaegerLink.href = 'http://localhost:16686';
+        copyTrace.disabled = true;
+      }
+    }
+
+    function parseJSON(text) {
+      if (!text) {
+        return null;
+      }
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    }
+
+    copyTrace.addEventListener('click', async () => {
+      const value = traceIdEl.textContent.trim();
+      if (!value || value === '无 trace id') {
+        return;
+      }
+      const feedback = document.getElementById('copy-feedback');
+      try {
+        await navigator.clipboard.writeText(value);
+        feedback.textContent = 'TraceId 已复制';
+      } catch {
+        feedback.textContent = '无法访问剪贴板，请手动选择并复制 TraceId。';
+      }
+    });
+
+    renderScenarios();
+  </script>
+</body>
+</html>

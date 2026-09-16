@@ -1,0 +1,29 @@
+server:
+  name: service-a
+  port: 8080
+
+otel:
+  service_name: service-a
+  endpoint: otel-collector:4317
+  insecure: true
+
+peer:
+  service_b_url: http://service-b:8080
+  service_a_url: http://service-a:8080
+  service_c_url: http://service-c:8080
+  service_d_url: http://service-d:8080
+
+mysql:
+  dsn: demo:change-me@tcp(host.docker.internal:3306)/otel_demo?charset=utf8mb4&parseTime=True&loc=Local
+
+redis:
+  addr: host.docker.internal:6379
+  password: ""
+  db: 0
+
+rabbitmq:
+  url: amqp://demo:change-me@host.docker.internal:5672/
+  queue: otel-demo-queue
+  exchange: ""
+  routing_key: otel-demo-queue
+  enabled: true

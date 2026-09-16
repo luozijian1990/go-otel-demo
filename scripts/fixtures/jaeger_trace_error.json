@@ -1,0 +1,86 @@
+{
+  "data": [
+    {
+      "traceID": "abc123",
+      "spans": [
+        {
+          "traceID": "abc123",
+          "spanID": "root",
+          "operationName": "EntryPoint",
+          "references": [],
+          "duration": 10000,
+          "startTime": 1,
+          "processID": "p1",
+          "tags": [
+            {
+              "key": "http.response.status_code",
+              "value": 500
+            },
+            {
+              "key": "network.peer.address",
+              "value": "127.0.0.1"
+            },
+            {
+              "key": "otel.status_code",
+              "value": "ERROR"
+            }
+          ],
+          "logs": []
+        },
+        {
+          "traceID": "abc123",
+          "spanID": "child",
+          "operationName": "GET /error",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "spanID": "root"
+            }
+          ],
+          "duration": 3000,
+          "startTime": 2,
+          "processID": "p2",
+          "tags": [
+            {
+              "key": "http.route",
+              "value": "/error"
+            },
+            {
+              "key": "error",
+              "value": true
+            }
+          ],
+          "logs": [
+            {
+              "fields": [
+                {
+                  "key": "event",
+                  "value": "exception"
+                },
+                {
+                  "key": "exception.message",
+                  "value": "intentional failure"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "processes": {
+        "p1": {
+          "serviceName": "traefik",
+          "tags": [
+            {
+              "key": "telemetry.sdk.version",
+              "value": "1.0"
+            }
+          ]
+        },
+        "p2": {
+          "serviceName": "service-a",
+          "tags": []
+        }
+      }
+    }
+  ]
+}

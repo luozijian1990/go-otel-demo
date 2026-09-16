@@ -1,0 +1,3 @@
+interface:
+  display_name: "Jaeger Trace Rootcause"
+  short_description: "Analyze Traefik TraceId and Jaeger spans for local OTel root cause debugging"

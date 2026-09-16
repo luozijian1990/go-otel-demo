@@ -1,0 +1,82 @@
+# 接收器：Traefik 和四个 Go 服务通过 OTLP 把 trace 发到 Collector。
+receivers:
+  otlp:
+    protocols:
+      # OTLP gRPC 入口，对应 Compose 中的 OTEL_EXPORTER_OTLP_ENDPOINT。
+      grpc:
+        endpoint: 0.0.0.0:4317
+      # OTLP HTTP 入口，预留给使用 HTTP 协议上报的客户端。
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # 尾部采样：Collector 先收集完整 trace，再根据整条 trace 的状态决定是否保留。
+  # 注意：tail_sampling 必须放在 batch 前面，否则采样决策可能不符合预期。
+  tail_sampling:
+    # 等待同一条 trace 的 span 尽量到齐后再做采样决策。
+    decision_wait: 10s
+    # Collector 内存中最多缓存的 trace 数量，用于等待采样决策。
+    num_traces: 50000
+    # 预估每秒新 trace 数量，帮助 Collector 做内部缓存管理。
+    expected_new_traces_per_sec: 100
+    policies:
+      # 兼容旧版 HTTP 语义约定：HTTP status code 为 5xx 的 trace 100% 保留。
+      - name: keep-http-5xx-old-semconv
+        type: numeric_attribute
+        numeric_attribute:
+          key: http.status_code
+          min_value: 500
+          max_value: 599
+      # 兼容新版 HTTP 语义约定：HTTP response status code 为 5xx 的 trace 100% 保留。
+      - name: keep-http-5xx-new-semconv
+        type: numeric_attribute
+        numeric_attribute:
+          key: http.response.status_code
+          min_value: 500
+          max_value: 599
+      # span status 被设置为 ERROR 的 trace 100% 保留。
+      - name: keep-error-status
+        type: status_code
+        status_code:
+          status_codes:
+            - ERROR
+      # 慢请求 100% 保留。这里阈值是 3000ms，对应 Demo 里的 /slow sleep 5 秒。
+      - name: keep-slow-requests
+        type: latency
+        latency:
+          threshold_ms: 3000
+      # 其他正常请求只保留 1%，用于模拟生产环境降低存储成本。
+      - name: keep-one-percent-normal
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 1
+  # 批处理：采样完成后再批量导出，提高导出效率。
+  batch:
+    timeout: 2s
+    send_batch_size: 1024
+
+exporters:
+  # 把采样后的 trace 通过 OTLP gRPC 转发给 Jaeger all-in-one。
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      # 本地 docker compose 网络内通信，不启用 TLS。
+      insecure: true
+  # 调试 exporter：在 Collector 日志中输出简要 trace 信息，便于本地排查。
+  debug:
+    verbosity: basic
+
+service:
+  pipelines:
+    traces:
+      # trace pipeline：接收 OTLP trace。
+      receivers:
+        - otlp
+      # 处理顺序很重要：先 tail_sampling，再 batch。
+      processors:
+        - tail_sampling
+        - batch
+      # 同时导出到 Jaeger 和 debug 日志。
+      exporters:
+        - otlp/jaeger
+        - debug
