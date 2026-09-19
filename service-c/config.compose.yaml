@@ -1,0 +1,13 @@
+server:
+  name: service-c
+  port: 8080
+
+otel:
+  service_name: service-c
+  endpoint: otel-collector:4317
+  insecure: true
+
+redis:
+  addr: redis:6379
+  password: ""
+  db: 0

@@ -22,6 +22,8 @@ accessLog:
   format: json
   fields:
     defaultMode: keep
+    headers:
+      defaultMode: drop
 
 tracing:
   serviceName: traefik

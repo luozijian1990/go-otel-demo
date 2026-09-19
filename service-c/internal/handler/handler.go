@@ -10,6 +10,7 @@ import (
 	redisstore "go-otel-demo/service-c/internal/redis"
 
 	"github.com/gin-gonic/gin"
+	"go-otel-demo/service-c/internal/exercise"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -33,10 +34,26 @@ func TraceIDHeaderMiddleware() gin.HandlerFunc {
 }
 
 func (h *Handler) Register(router *gin.Engine) {
+	h.registerExercise(router)
 	router.GET("/health", h.Health)
 	router.GET("/redis/ok", h.RedisOK)
 	router.GET("/redis/error", h.RedisError)
 	router.GET("/redis/slow", h.RedisSlow)
+}
+
+func (h *Handler) registerExercise(router *gin.Engine) {
+	exercise.Register(router, h.cfg.Server.Name, nil, func(ctx context.Context, action string) error {
+		if action == "application_delay" {
+			if err := exercise.Wait(ctx, 4*time.Second); err != nil {
+				return err
+			}
+		}
+		if action == "connect_refused" || action == "degraded" {
+			return h.redis.BrokenOperation(ctx)
+		}
+		_, err := h.redis.SetGet(ctx, fmt.Sprintf("demo:exercise:%d", time.Now().UnixNano()), "value")
+		return err
+	})
 }
 
 func (h *Handler) Health(c *gin.Context) {

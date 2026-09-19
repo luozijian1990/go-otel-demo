@@ -3,7 +3,9 @@ package database
 import (
 	"context"
 	"fmt"
+	"go-otel-demo/service-a/internal/telemetry"
 	"strings"
+	"time"
 
 	"go-otel-demo/service-a/internal/model"
 
@@ -16,7 +18,19 @@ type Store struct {
 }
 
 func New(ctx context.Context, dsn string) (*Store, error) {
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	var db *gorm.DB
+	var err error
+	for attempt := 0; attempt < 5; attempt++ {
+		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		if err == nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("connect mysql: %w", err)
 	}
@@ -28,6 +42,14 @@ func New(ctx context.Context, dsn string) (*Store, error) {
 	}
 
 	return store, nil
+}
+
+func (s *Store) Ping(ctx context.Context) error {
+	db, err := s.db.DB()
+	if err != nil {
+		return err
+	}
+	return db.PingContext(ctx)
 }
 
 func (s *Store) Close() error {
@@ -70,7 +92,9 @@ func isIgnorableEmailIndexMigrationError(err error) bool {
 		(strings.Contains(msg, "Duplicate key name") || strings.Contains(msg, "Can't DROP"))
 }
 
-func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
+func (s *Store) ListUsers(ctx context.Context) (_ []model.User, resultErr error) {
+	start := time.Now()
+	defer func() { telemetry.Observe(ctx, "mysql", "query", start, resultErr) }()
 	var users []model.User
 	if err := s.db.WithContext(ctx).Order("id asc").Find(&users).Error; err != nil {
 		return nil, fmt.Errorf("list users: %w", err)
@@ -78,7 +102,9 @@ func (s *Store) ListUsers(ctx context.Context) ([]model.User, error) {
 	return users, nil
 }
 
-func (s *Store) QueryBrokenTable(ctx context.Context) error {
+func (s *Store) QueryBrokenTable(ctx context.Context) (resultErr error) {
+	start := time.Now()
+	defer func() { telemetry.Observe(ctx, "mysql", "query", start, resultErr) }()
 	var rows []map[string]any
 	if err := s.db.WithContext(ctx).Table("users_table_that_does_not_exist").Find(&rows).Error; err != nil {
 		return fmt.Errorf("query broken table: %w", err)

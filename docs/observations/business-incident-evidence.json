@@ -1,0 +1,4073 @@
+{
+  "traces": {
+    "query": {
+      "path": "/api/traces/3aef1819fb5839f5b8bbb90777993605",
+      "parameters": null
+    },
+    "evidence": [
+      {
+        "evidence_id": "T-f7340c0c19d30d5c",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "d67f5bbd89c68a33",
+          "parent_span_id": null,
+          "service": "order-service",
+          "operation": "business.request",
+          "duration_ms": 16.241,
+          "start_time": 1789805885845973,
+          "time_unit": "microseconds",
+          "references": [],
+          "tags": {
+            "demo.traffic_driver": true,
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.166
+        }
+      },
+      {
+        "evidence_id": "T-9f74927a6b569eaf",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "45216eb71c46fd33",
+          "parent_span_id": "d67f5bbd89c68a33",
+          "service": "order-service",
+          "operation": "POST",
+          "duration_ms": 16.075,
+          "start_time": 1789805885846103,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "d67f5bbd89c68a33"
+            }
+          ],
+          "tags": {
+            "error": true,
+            "http.request.method": "POST",
+            "http.response.status_code": 500,
+            "otel.status_code": "ERROR",
+            "server.address": "localhost",
+            "server.port": 0,
+            "span.kind": "client",
+            "url.full": "http://traefik/orders"
+          },
+          "is_error": true,
+          "exclusive_ms": 0.929
+        }
+      },
+      {
+        "evidence_id": "T-150c40ab3cd846eb",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "eed9d96b26a4a8c2",
+          "parent_span_id": "45216eb71c46fd33",
+          "service": "traefik",
+          "operation": "EntryPoint",
+          "duration_ms": 15.146,
+          "start_time": 1789805885846945,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "45216eb71c46fd33"
+            }
+          ],
+          "tags": {
+            "entry_point": "web",
+            "error": true,
+            "http.request.method": "POST",
+            "http.response.status_code": 500,
+            "otel.status_code": "ERROR",
+            "server.address": "localhost",
+            "span.kind": "server",
+            "url.path": "/orders",
+            "url.query": "",
+            "url.scheme": "http"
+          },
+          "is_error": true,
+          "exclusive_ms": 0.194
+        }
+      },
+      {
+        "evidence_id": "T-b100f0c3abce0585",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "3acf8148a85ce3cf",
+          "parent_span_id": "eed9d96b26a4a8c2",
+          "service": "traefik",
+          "operation": "Router",
+          "duration_ms": 14.952,
+          "start_time": 1789805885846992,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "eed9d96b26a4a8c2"
+            }
+          ],
+          "tags": {
+            "http.route": "(Host(`localhost`) || Host(`127.0.0.1`)) && (PathPrefix(`/orders`) || PathPrefix(`/demo`))",
+            "span.kind": "internal",
+            "traefik.router.name": "orders@file",
+            "traefik.service.name": "order@file"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.013
+        }
+      },
+      {
+        "evidence_id": "T-323ee06ffd143510",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "5de65e7c5a9f948e",
+          "parent_span_id": "3acf8148a85ce3cf",
+          "service": "traefik",
+          "operation": "Service",
+          "duration_ms": 14.939,
+          "start_time": 1789805885847001,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "3acf8148a85ce3cf"
+            }
+          ],
+          "tags": {
+            "span.kind": "internal",
+            "traefik.service.name": "order@file"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.128
+        }
+      },
+      {
+        "evidence_id": "T-55d3057b9b4eab5a",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "31362cb2a305eaef",
+          "parent_span_id": "5de65e7c5a9f948e",
+          "service": "traefik",
+          "operation": "ReverseProxy",
+          "duration_ms": 14.811,
+          "start_time": 1789805885847020,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "5de65e7c5a9f948e"
+            }
+          ],
+          "tags": {
+            "error": true,
+            "http.request.method": "POST",
+            "http.response.status_code": 500,
+            "otel.status_code": "ERROR",
+            "server.address": "order-service",
+            "server.port": 8080,
+            "span.kind": "client",
+            "url.full": "http://order-service:8080/orders",
+            "url.scheme": "http"
+          },
+          "is_error": true,
+          "exclusive_ms": 0.718
+        }
+      },
+      {
+        "evidence_id": "T-1bd0014feeffd868",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "cc2da1591d44974d",
+          "parent_span_id": "31362cb2a305eaef",
+          "service": "order-service",
+          "operation": "POST /orders",
+          "duration_ms": 14.093,
+          "start_time": 1789805885847586,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "31362cb2a305eaef"
+            }
+          ],
+          "tags": {
+            "error": true,
+            "http.request.method": "POST",
+            "http.response.status_code": 500,
+            "http.route": "/orders",
+            "otel.status_code": "ERROR",
+            "span.kind": "server",
+            "url.path": "/orders",
+            "url.query": "",
+            "url.scheme": "http"
+          },
+          "is_error": true,
+          "exception_logs": [
+            {
+              "event": "exception",
+              "exception.message": "inventory-service returned 500: {\"error\":\"Error 1146 (42S02): Table 'otel_demo.inventory_service_journal_unavailable' doesn't exist\",\"service\":\"inventory-service\"}",
+              "exception.type": "*commerce.peerError",
+              "timestamp_us": 1789805885861617
+            }
+          ],
+          "exclusive_ms": 0.914
+        }
+      },
+      {
+        "evidence_id": "T-84bd6c671e7cb003",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "97145cbdec38db56",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "SELECT commerce_orders",
+          "duration_ms": 0.999,
+          "start_time": 1789805885847811,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "commerce_orders",
+            "db.operation.name": "SELECT",
+            "db.query.text": "SELECT * FROM `commerce_orders` WHERE id = ? LIMIT ?",
+            "db.system.name": "mysql",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.999
+        }
+      },
+      {
+        "evidence_id": "T-f7ce7cee7bd0ec7e",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "5c0ed709ff6bcd29",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "GET",
+          "duration_ms": 0.795,
+          "start_time": 1789805885848955,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "http.request.method": "GET",
+            "http.response.status_code": 200,
+            "otel.status_code": "OK",
+            "server.address": "product-service:8080",
+            "server.port": 8080,
+            "span.kind": "client",
+            "url.full": "http://product-service:8080/products/SKU-001"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.367
+        }
+      },
+      {
+        "evidence_id": "T-864f3a70334fc9b4",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "9151fd632b238fa3",
+          "parent_span_id": "5c0ed709ff6bcd29",
+          "service": "product-service",
+          "operation": "GET /products/SKU-001",
+          "duration_ms": 0.428,
+          "start_time": 1789805885849169,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "5c0ed709ff6bcd29"
+            }
+          ],
+          "tags": {
+            "http.request.method": "GET",
+            "http.response.status_code": 200,
+            "http.route": "/products/SKU-001",
+            "otel.status_code": "OK",
+            "span.kind": "server",
+            "url.path": "/products/SKU-001",
+            "url.query": "",
+            "url.scheme": "http"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.255
+        }
+      },
+      {
+        "evidence_id": "T-7221dd63bc0ecf8f",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "20d81409c52018e2",
+          "parent_span_id": "9151fd632b238fa3",
+          "service": "product-service",
+          "operation": "get",
+          "duration_ms": 0.173,
+          "start_time": 1789805885849281,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "9151fd632b238fa3"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "",
+            "db.operation.name": "get",
+            "db.query.text": "get commerce:product:SKU-001",
+            "db.system.name": "redis",
+            "server.address": "redis:6379",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.173
+        }
+      },
+      {
+        "evidence_id": "T-324987ac33db6a9c",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "0bf1372f37621e1a",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "START",
+          "duration_ms": 0.144,
+          "start_time": 1789805885849799,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "",
+            "db.operation.name": "START",
+            "db.query.text": "START TRANSACTION",
+            "db.system.name": "mysql",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.144
+        }
+      },
+      {
+        "evidence_id": "T-e0d198794a0b2bff",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "f7c5fbf67e45319f",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "INSERT commerce_orders",
+          "duration_ms": 0.566,
+          "start_time": 1789805885849972,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "commerce_orders",
+            "db.operation.name": "INSERT",
+            "db.query.text": "INSERT INTO `commerce_orders` (`id`,`sku`,`quantity`,`amount`,`state`) VALUES (?,?,?,?,?)",
+            "db.system.name": "mysql",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.566
+        }
+      },
+      {
+        "evidence_id": "T-94f3fe8e80d43563",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "3213e48cee09c27a",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "COMMIT",
+          "duration_ms": 3.664,
+          "start_time": 1789805885850554,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "",
+            "db.operation.name": "COMMIT",
+            "db.query.text": "COMMIT",
+            "db.system.name": "mysql",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 3.664
+        }
+      },
+      {
+        "evidence_id": "T-a09a9928397884b8",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "97652ad7c725c8f4",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "POST",
+          "duration_ms": 4.75,
+          "start_time": 1789805885854365,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "error": true,
+            "http.request.method": "POST",
+            "http.response.status_code": 500,
+            "otel.status_code": "ERROR",
+            "server.address": "inventory-service:8080",
+            "server.port": 8080,
+            "span.kind": "client",
+            "url.full": "http://inventory-service:8080/reservations"
+          },
+          "is_error": true,
+          "exclusive_ms": 0.399
+        }
+      },
+      {
+        "evidence_id": "T-675db31cbd85c400",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "e0b4919270dca3b7",
+          "parent_span_id": "97652ad7c725c8f4",
+          "service": "inventory-service",
+          "operation": "POST /reservations",
+          "duration_ms": 4.351,
+          "start_time": 1789805885854607,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "97652ad7c725c8f4"
+            }
+          ],
+          "tags": {
+            "error": true,
+            "http.request.method": "POST",
+            "http.response.status_code": 500,
+            "http.route": "/reservations",
+            "otel.status_code": "ERROR",
+            "span.kind": "server",
+            "url.path": "/reservations",
+            "url.query": "",
+            "url.scheme": "http"
+          },
+          "is_error": true,
+          "exception_logs": [
+            {
+              "event": "exception",
+              "exception.message": "Error 1146 (42S02): Table 'otel_demo.inventory_service_journal_unavailable' doesn't exist",
+              "exception.type": "*mysql.MySQLError",
+              "timestamp_us": 1789805885858898
+            }
+          ],
+          "exclusive_ms": 0.417
+        }
+      },
+      {
+        "evidence_id": "T-eb67a02ff0b9ddd6",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "023478f629717827",
+          "parent_span_id": "e0b4919270dca3b7",
+          "service": "inventory-service",
+          "operation": "SELECT inventory_service_journal_unavailable",
+          "duration_ms": 3.934,
+          "start_time": 1789805885854760,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "e0b4919270dca3b7"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "inventory_service_journal_unavailable",
+            "db.operation.name": "SELECT",
+            "db.query.text": "SELECT * FROM `inventory_service_journal_unavailable`",
+            "db.system.name": "mysql",
+            "error": true,
+            "otel.status_code": "ERROR",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": true,
+          "exception_logs": [
+            {
+              "event": "exception",
+              "exception.message": "Error 1146 (42S02): Table 'otel_demo.inventory_service_journal_unavailable' doesn't exist",
+              "exception.type": "*mysql.MySQLError",
+              "timestamp_us": 1789805885858714
+            }
+          ],
+          "exclusive_ms": 3.934
+        }
+      },
+      {
+        "evidence_id": "T-26cd219ce2c658e7",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "ddbd3d7553040db7",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "START",
+          "duration_ms": 0.178,
+          "start_time": 1789805885859213,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "",
+            "db.operation.name": "START",
+            "db.query.text": "START TRANSACTION",
+            "db.system.name": "mysql",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.178
+        }
+      },
+      {
+        "evidence_id": "T-7fa1fbb1c1b164e9",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "8ad3cfb93416157e",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "UPDATE commerce_orders",
+          "duration_ms": 0.708,
+          "start_time": 1789805885859431,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "commerce_orders",
+            "db.operation.name": "UPDATE",
+            "db.query.text": "UPDATE `commerce_orders` SET `state`=? WHERE `id` = ?",
+            "db.system.name": "mysql",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 0.708
+        }
+      },
+      {
+        "evidence_id": "T-05bff6d69a9ecb6b",
+        "data": {
+          "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+          "span_id": "b70837b3e9fc2a47",
+          "parent_span_id": "cc2da1591d44974d",
+          "service": "order-service",
+          "operation": "COMMIT",
+          "duration_ms": 1.375,
+          "start_time": 1789805885860157,
+          "time_unit": "microseconds",
+          "references": [
+            {
+              "refType": "CHILD_OF",
+              "traceID": "3aef1819fb5839f5b8bbb90777993605",
+              "spanID": "cc2da1591d44974d"
+            }
+          ],
+          "tags": {
+            "db.collection.name": "",
+            "db.operation.name": "COMMIT",
+            "db.query.text": "COMMIT",
+            "db.system.name": "mysql",
+            "server.address": "mysql:3306",
+            "span.kind": "client"
+          },
+          "is_error": false,
+          "exclusive_ms": 1.375
+        }
+      }
+    ],
+    "status": "available",
+    "attempts": 1,
+    "truncated": false,
+    "limitations": [
+      "Missing trace does not prove sampling loss. Ordinary successes retain about 1%.",
+      "Exclusive duration unions child intervals; incomplete parents or clock skew limit causality."
+    ],
+    "source": "traces",
+    "window": {
+      "start": "2026-09-19T08:17:45+00:00",
+      "end": "2026-09-19T08:18:45+00:00"
+    },
+    "collected_at": "2026-09-19T08:20:34.280725+00:00"
+  },
+  "logs": {
+    "query": {
+      "query": "{service_name=~\"order-service|payment-service|inventory-service|product-service\"} | trace_id=\"3aef1819fb5839f5b8bbb90777993605\"",
+      "start": "1789805865000000000",
+      "end": "1789805925000000000",
+      "limit": 100,
+      "direction": "forward"
+    },
+    "evidence": [
+      {
+        "evidence_id": "L-ef75da16530dccdd",
+        "data": {
+          "timestamp_ns": "1789805885858835925",
+          "message": "dependency operation",
+          "metadata": {
+            "dependency": "mysql",
+            "detected_level": "ERROR",
+            "duration_ms": "4.087",
+            "error_message": "Error 1146 (42S02): Table 'otel_demo.inventory_service_journal_unavailable' doesn't exist",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "ERROR",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040196175",
+            "operation": "query",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "inventory-service",
+            "severity_number": "17",
+            "severity_text": "ERROR",
+            "span_id": "e0b4919270dca3b7",
+            "timestamp": "2026-09-19T08:18:05.858835925Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-77e7b39e7c60264d",
+        "data": {
+          "timestamp_ns": "1789805885848887758",
+          "message": "dependency operation",
+          "metadata": {
+            "dependency": "mysql",
+            "detected_level": "INFO",
+            "duration_ms": "1.117",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040034675",
+            "operation": "order_lookup",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "order-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "cc2da1591d44974d",
+            "timestamp": "2026-09-19T08:18:05.848887758Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-eea0652ef9056fb1",
+        "data": {
+          "timestamp_ns": "1789805885861568217",
+          "message": "dependency operation",
+          "metadata": {
+            "dependency": "mysql",
+            "detected_level": "INFO",
+            "duration_ms": "2.352",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040039009",
+            "operation": "order_update",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "order-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "cc2da1591d44974d",
+            "timestamp": "2026-09-19T08:18:05.861568217Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-0d01a617baef7db8",
+        "data": {
+          "timestamp_ns": "1789805885854273217",
+          "message": "dependency operation",
+          "metadata": {
+            "dependency": "mysql",
+            "detected_level": "INFO",
+            "duration_ms": "4.462",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040037800",
+            "operation": "order_create",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "order-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "cc2da1591d44974d",
+            "timestamp": "2026-09-19T08:18:05.854273217Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-a48b390546f01486",
+        "data": {
+          "timestamp_ns": "1789805885849508925",
+          "message": "dependency operation",
+          "metadata": {
+            "dependency": "redis",
+            "detected_level": "INFO",
+            "duration_ms": "0.215",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040022092",
+            "operation": "get",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "product-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "9151fd632b238fa3",
+            "timestamp": "2026-09-19T08:18:05.849508925Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-8fabc27dd8ac22c6",
+        "data": {
+          "timestamp_ns": "1789805885858904425",
+          "message": "business operation failed",
+          "metadata": {
+            "detected_level": "ERROR",
+            "error_message": "Error 1146 (42S02): Table 'otel_demo.inventory_service_journal_unavailable' doesn't exist",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "ERROR",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040197425",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "inventory-service",
+            "severity_number": "17",
+            "severity_text": "ERROR",
+            "span_id": "e0b4919270dca3b7",
+            "timestamp": "2026-09-19T08:18:05.858904425Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-475726da8025f909",
+        "data": {
+          "timestamp_ns": "1789805885861619925",
+          "message": "business operation failed",
+          "metadata": {
+            "detected_level": "ERROR",
+            "error_message": "inventory-service returned 500: {\"error\":\"Error 1146 (42S02): Table 'otel_demo.inventory_service_journal_unavailable' doesn't exist\",\"service\":\"inventory-service\"}",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "ERROR",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040041259",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "order-service",
+            "severity_number": "17",
+            "severity_text": "ERROR",
+            "span_id": "cc2da1591d44974d",
+            "timestamp": "2026-09-19T08:18:05.861619925Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-131ed7eac24ac9eb",
+        "data": {
+          "timestamp_ns": "1789805885849584592",
+          "message": "request completed",
+          "metadata": {
+            "detected_level": "INFO",
+            "duration_ms": "0.370583",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "http_method": "GET",
+            "http_route": "/products/:sku",
+            "http_status_code": "200",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040026842",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "product-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "9151fd632b238fa3",
+            "timestamp": "2026-09-19T08:18:05.849584592Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-cd4626016a00040a",
+        "data": {
+          "timestamp_ns": "1789805885861651467",
+          "message": "request completed",
+          "metadata": {
+            "detected_level": "INFO",
+            "duration_ms": "14.019416999999999",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "http_method": "POST",
+            "http_route": "/orders",
+            "http_status_code": "500",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040042134",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "order-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "cc2da1591d44974d",
+            "timestamp": "2026-09-19T08:18:05.861651467Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-7e926dcb002fa66f",
+        "data": {
+          "timestamp_ns": "1789805885858941717",
+          "message": "request completed",
+          "metadata": {
+            "detected_level": "INFO",
+            "duration_ms": "4.294541",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "http_method": "POST",
+            "http_route": "/reservations",
+            "http_status_code": "500",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040208134",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "inventory-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "e0b4919270dca3b7",
+            "timestamp": "2026-09-19T08:18:05.858941717Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      },
+      {
+        "evidence_id": "L-02a1d81846f33e1f",
+        "data": {
+          "timestamp_ns": "1789805885861608092",
+          "message": "order state changed",
+          "metadata": {
+            "detected_level": "INFO",
+            "experiment_id": "fa02f34e0ff8c8788170f9befc52d732",
+            "level": "INFO",
+            "log_file_name": "app.log",
+            "observed_timestamp": "1789805886040040134",
+            "order_id": "7dc61106c00d2070e48869169be1b2e3",
+            "request_id": "97b70428210aa4e5a25912884a325f9d",
+            "service_name": "order-service",
+            "severity_number": "9",
+            "severity_text": "INFO",
+            "span_id": "cc2da1591d44974d",
+            "state": "failed",
+            "timestamp": "2026-09-19T08:18:05.861608092Z",
+            "trace_id": "3aef1819fb5839f5b8bbb90777993605",
+            "trace_sampled": "true"
+          },
+          "correlation": "exact_trace_id"
+        }
+      }
+    ],
+    "status": "available",
+    "truncated": false,
+    "limitations": [
+      "Time-only logs are correlated context, not proof they belong to one request.",
+      "For window traffic, narrow to incident timestamps or representative TraceIds; a capped run query can contain only early baseline logs."
+    ],
+    "source": "logs",
+    "window": {
+      "start": "2026-09-19T08:17:45+00:00",
+      "end": "2026-09-19T08:18:45+00:00"
+    },
+    "collected_at": "2026-09-19T08:20:35.225211+00:00"
+  },
+  "metrics": {
+    "query": "fixed business metric templates; 1m rolling rates",
+    "evidence": [
+      {
+        "evidence_id": "M-537b792830fca1ce",
+        "data": {
+          "name": "request_rate",
+          "query": "sum by(service_name,http_route)(rate(demo_http_requests_total{service_name=~\"order-service|payment-service|inventory-service|product-service\"}[1m]))",
+          "unit": "requests/second",
+          "series": [
+            {
+              "metric": {
+                "http_route": "/inventory/:sku",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/orders",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/orders",
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0.09091074383170604"
+                ],
+                [
+                  1789805880,
+                  "0.18182479362885923"
+                ],
+                [
+                  1789805885,
+                  "0.2727272727272727"
+                ],
+                [
+                  1789805890,
+                  "0.36364297532682416"
+                ],
+                [
+                  1789805895,
+                  "0.4546033131489463"
+                ],
+                [
+                  1789805900,
+                  "0.5441641363176299"
+                ],
+                [
+                  1789805905,
+                  "0.6286634665502988"
+                ],
+                [
+                  1789805910,
+                  "0.7183049378450946"
+                ],
+                [
+                  1789805915,
+                  "0.8091878787878788"
+                ],
+                [
+                  1789805920,
+                  "0.8274278406129154"
+                ],
+                [
+                  1789805925,
+                  "0.8273610176784665"
+                ],
+                [
+                  1789805930,
+                  "0.7364465534586622"
+                ],
+                [
+                  1789805935,
+                  "0.6455347078288063"
+                ],
+                [
+                  1789805940,
+                  "0.5546387035387235"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/orders",
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/orders",
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/orders/:id",
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/orders/:id/cancel",
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0.09091074383170604"
+                ],
+                [
+                  1789805880,
+                  "0.18182479362885923"
+                ],
+                [
+                  1789805885,
+                  "0.2727272727272727"
+                ],
+                [
+                  1789805890,
+                  "0.2909143802614593"
+                ],
+                [
+                  1789805895,
+                  "0.29094612041532564"
+                ],
+                [
+                  1789805900,
+                  "0.2909143802614593"
+                ],
+                [
+                  1789805905,
+                  "0.29091966980617473"
+                ],
+                [
+                  1789805910,
+                  "0.3636561994290598"
+                ],
+                [
+                  1789805915,
+                  "0.45454545454545453"
+                ],
+                [
+                  1789805920,
+                  "0.4727788486016657"
+                ],
+                [
+                  1789805925,
+                  "0.47271867784222105"
+                ],
+                [
+                  1789805930,
+                  "0.38180429802552635"
+                ],
+                [
+                  1789805935,
+                  "0.2908985127813534"
+                ],
+                [
+                  1789805940,
+                  "0.19999636370247814"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/orders/:id/pay",
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/payments",
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/products/:sku",
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0.05454545454545454"
+                ],
+                [
+                  1789805880,
+                  "0.14544396771143916"
+                ],
+                [
+                  1789805885,
+                  "0.23635933892111052"
+                ],
+                [
+                  1789805890,
+                  "0.32727867779414177"
+                ],
+                [
+                  1789805895,
+                  "0.41818181818181815"
+                ],
+                [
+                  1789805900,
+                  "0.509090909090909"
+                ],
+                [
+                  1789805905,
+                  "0.6000327290579486"
+                ],
+                [
+                  1789805910,
+                  "0.6909216531209659"
+                ],
+                [
+                  1789805915,
+                  "0.7818181818181817"
+                ],
+                [
+                  1789805920,
+                  "0.8364092586868375"
+                ],
+                [
+                  1789805925,
+                  "0.8363636363636363"
+                ],
+                [
+                  1789805930,
+                  "0.7818039672005963"
+                ],
+                [
+                  1789805935,
+                  "0.6909216531209659"
+                ],
+                [
+                  1789805940,
+                  "0.599912739965096"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/reservations",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0.03636561994290598"
+                ],
+                [
+                  1789805880,
+                  "0.1272796698001709"
+                ],
+                [
+                  1789805885,
+                  "0.21816595156715873"
+                ],
+                [
+                  1789805890,
+                  "0.2909567020057828"
+                ],
+                [
+                  1789805895,
+                  "0.44755690916551844"
+                ],
+                [
+                  1789805900,
+                  "0.5308259310484045"
+                ],
+                [
+                  1789805905,
+                  "0.614330249472689"
+                ],
+                [
+                  1789805910,
+                  "0.6963361045377076"
+                ],
+                [
+                  1789805915,
+                  "0.7764580952542638"
+                ],
+                [
+                  1789805920,
+                  "0.8419682122201955"
+                ],
+                [
+                  1789805925,
+                  "0.8368289211574071"
+                ],
+                [
+                  1789805930,
+                  "0.7966030112260617"
+                ],
+                [
+                  1789805935,
+                  "0.7026852683702449"
+                ],
+                [
+                  1789805940,
+                  "0.6085863218848718"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/reservations/:id/confirm",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "http_route": "/reservations/:id/release",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0.03636561994290598"
+                ],
+                [
+                  1789805880,
+                  "0.1272796698001709"
+                ],
+                [
+                  1789805885,
+                  "0.21816595156715873"
+                ],
+                [
+                  1789805890,
+                  "0.2909567020057828"
+                ],
+                [
+                  1789805895,
+                  "0.2909355395945086"
+                ],
+                [
+                  1789805900,
+                  "0.29089322400596335"
+                ],
+                [
+                  1789805905,
+                  "0.2909302494726889"
+                ],
+                [
+                  1789805910,
+                  "0.3091246317780122"
+                ],
+                [
+                  1789805915,
+                  "0.40002181937196574"
+                ],
+                [
+                  1789805920,
+                  "0.4727272727272727"
+                ],
+                [
+                  1789805925,
+                  "0.4727272727272727"
+                ],
+                [
+                  1789805930,
+                  "0.4363557026235887"
+                ],
+                [
+                  1789805935,
+                  "0.34543570350708147"
+                ],
+                [
+                  1789805940,
+                  "0.2545547110804029"
+                ]
+              ]
+            }
+          ],
+          "status": "available"
+        }
+      },
+      {
+        "evidence_id": "M-dbaef9173aac0f8a",
+        "data": {
+          "name": "error_percent",
+          "query": "100*sum by(service_name)(rate(demo_http_requests_total{service_name=~\"order-service|payment-service|inventory-service|product-service\",status_class=\"5xx\"}[1m]))/sum by(service_name)(rate(demo_http_requests_total{service_name=~\"order-service|payment-service|inventory-service|product-service\"}[1m]))",
+          "unit": "percent",
+          "series": [
+            {
+              "metric": {
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "21.20825606734185"
+                ],
+                [
+                  1789805900,
+                  "29.19886990179344"
+                ],
+                [
+                  1789805905,
+                  "35.72452353513257"
+                ],
+                [
+                  1789805910,
+                  "38.51084968056963"
+                ],
+                [
+                  1789805915,
+                  "31.99682979729346"
+                ],
+                [
+                  1789805920,
+                  "28.08566270444571"
+                ],
+                [
+                  1789805925,
+                  "27.803438304549562"
+                ],
+                [
+                  1789805930,
+                  "29.21811611012324"
+                ],
+                [
+                  1789805935,
+                  "34.084764492717014"
+                ],
+                [
+                  1789805940,
+                  "41.016658608873264"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "11.11111111111111"
+                ],
+                [
+                  1789805895,
+                  "21.951219512195124"
+                ],
+                [
+                  1789805900,
+                  "30.326460449924134"
+                ],
+                [
+                  1789805905,
+                  "36.72792414205373"
+                ],
+                [
+                  1789805910,
+                  "32.778325043126905"
+                ],
+                [
+                  1789805915,
+                  "28.06307429645687"
+                ],
+                [
+                  1789805920,
+                  "27.276354979029016"
+                ],
+                [
+                  1789805925,
+                  "27.278507699038375"
+                ],
+                [
+                  1789805930,
+                  "31.714016131750764"
+                ],
+                [
+                  1789805935,
+                  "37.8709540885766"
+                ],
+                [
+                  1789805940,
+                  "46.99521069604524"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "NaN"
+                ],
+                [
+                  1789805880,
+                  "NaN"
+                ],
+                [
+                  1789805885,
+                  "NaN"
+                ],
+                [
+                  1789805890,
+                  "NaN"
+                ],
+                [
+                  1789805895,
+                  "NaN"
+                ],
+                [
+                  1789805900,
+                  "NaN"
+                ],
+                [
+                  1789805905,
+                  "NaN"
+                ],
+                [
+                  1789805910,
+                  "NaN"
+                ],
+                [
+                  1789805915,
+                  "NaN"
+                ],
+                [
+                  1789805920,
+                  "NaN"
+                ],
+                [
+                  1789805925,
+                  "NaN"
+                ],
+                [
+                  1789805930,
+                  "NaN"
+                ],
+                [
+                  1789805935,
+                  "NaN"
+                ],
+                [
+                  1789805940,
+                  "NaN"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            }
+          ],
+          "status": "available"
+        }
+      },
+      {
+        "evidence_id": "M-7c9629cd2d656212",
+        "data": {
+          "name": "p95",
+          "query": "histogram_quantile(0.95,sum by(service_name,le)(rate(demo_http_request_duration_seconds_bucket{service_name=~\"order-service|payment-service|inventory-service|product-service\"}[1m])))",
+          "unit": "seconds",
+          "series": [
+            {
+              "metric": {
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0.009666666666666667"
+                ],
+                [
+                  1789805880,
+                  "0.02199999999999999"
+                ],
+                [
+                  1789805885,
+                  "0.009923076923076923"
+                ],
+                [
+                  1789805890,
+                  "0.009837499999999999"
+                ],
+                [
+                  1789805895,
+                  "0.009775"
+                ],
+                [
+                  1789805900,
+                  "0.0097125"
+                ],
+                [
+                  1789805905,
+                  "0.009650000000000002"
+                ],
+                [
+                  1789805910,
+                  "0.009595238095238094"
+                ],
+                [
+                  1789805915,
+                  "0.03171428571428568"
+                ],
+                [
+                  1789805920,
+                  "0.04054545454545456"
+                ],
+                [
+                  1789805925,
+                  "0.04054545454545456"
+                ],
+                [
+                  1789805930,
+                  "0.041272727272727266"
+                ],
+                [
+                  1789805935,
+                  "0.042399999999999986"
+                ],
+                [
+                  1789805940,
+                  "0.0444"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0.04666666666666667"
+                ],
+                [
+                  1789805880,
+                  "0.04666666666666666"
+                ],
+                [
+                  1789805885,
+                  "0.04666666666666666"
+                ],
+                [
+                  1789805890,
+                  "0.04860869565217392"
+                ],
+                [
+                  1789805895,
+                  "0.04844444444444445"
+                ],
+                [
+                  1789805900,
+                  "0.04826666666666666"
+                ],
+                [
+                  1789805905,
+                  "0.04812121212121212"
+                ],
+                [
+                  1789805910,
+                  "0.04897435897435898"
+                ],
+                [
+                  1789805915,
+                  "0.09166666666666673"
+                ],
+                [
+                  1789805920,
+                  "0.13999999999999907"
+                ],
+                [
+                  1789805925,
+                  "0.13999999999999987"
+                ],
+                [
+                  1789805930,
+                  "0.19000000000000003"
+                ],
+                [
+                  1789805935,
+                  "0.24000000000000002"
+                ],
+                [
+                  1789805940,
+                  "0.2899999999999999"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "NaN"
+                ],
+                [
+                  1789805880,
+                  "NaN"
+                ],
+                [
+                  1789805885,
+                  "NaN"
+                ],
+                [
+                  1789805890,
+                  "NaN"
+                ],
+                [
+                  1789805895,
+                  "NaN"
+                ],
+                [
+                  1789805900,
+                  "NaN"
+                ],
+                [
+                  1789805905,
+                  "NaN"
+                ],
+                [
+                  1789805910,
+                  "NaN"
+                ],
+                [
+                  1789805915,
+                  "NaN"
+                ],
+                [
+                  1789805920,
+                  "NaN"
+                ],
+                [
+                  1789805925,
+                  "NaN"
+                ],
+                [
+                  1789805930,
+                  "NaN"
+                ],
+                [
+                  1789805935,
+                  "NaN"
+                ],
+                [
+                  1789805940,
+                  "NaN"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0.00475"
+                ],
+                [
+                  1789805880,
+                  "0.00475"
+                ],
+                [
+                  1789805885,
+                  "0.00475"
+                ],
+                [
+                  1789805890,
+                  "0.004750000000000001"
+                ],
+                [
+                  1789805895,
+                  "0.00475"
+                ],
+                [
+                  1789805900,
+                  "0.00475"
+                ],
+                [
+                  1789805905,
+                  "0.00475"
+                ],
+                [
+                  1789805910,
+                  "0.00475"
+                ],
+                [
+                  1789805915,
+                  "0.0048630952380952375"
+                ],
+                [
+                  1789805920,
+                  "0.004855555555555555"
+                ],
+                [
+                  1789805925,
+                  "0.004855555555555556"
+                ],
+                [
+                  1789805930,
+                  "0.004863095238095238"
+                ],
+                [
+                  1789805935,
+                  "0.004878378378378378"
+                ],
+                [
+                  1789805940,
+                  "0.0048984375"
+                ]
+              ]
+            }
+          ],
+          "status": "available"
+        }
+      },
+      {
+        "evidence_id": "M-2e2948c6006054cb",
+        "data": {
+          "name": "dependency_errors",
+          "query": "sum by(service_name,dependency)(rate(demo_dependency_calls_total{service_name=~\"order-service|payment-service|inventory-service|product-service\",outcome=\"error\"}[1m]))",
+          "unit": "operations/second",
+          "series": [
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0.017698350639195504"
+                ],
+                [
+                  1789805895,
+                  "0.10618238021638329"
+                ],
+                [
+                  1789805900,
+                  "0.1946593822155155"
+                ],
+                [
+                  1789805905,
+                  "0.2831721094867506"
+                ],
+                [
+                  1789805910,
+                  "0.3539598259204035"
+                ],
+                [
+                  1789805915,
+                  "0.35395870077761815"
+                ],
+                [
+                  1789805920,
+                  "0.35395151515151513"
+                ],
+                [
+                  1789805925,
+                  "0.3539454545454545"
+                ],
+                [
+                  1789805930,
+                  "0.3539390192905583"
+                ],
+                [
+                  1789805935,
+                  "0.3539322097582556"
+                ],
+                [
+                  1789805940,
+                  "0.3539401432779374"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "redis",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "redis",
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "redis",
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "redis",
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            }
+          ],
+          "status": "available"
+        }
+      },
+      {
+        "evidence_id": "M-8111a26223d856de",
+        "data": {
+          "name": "dependency_mean",
+          "query": "sum by(service_name,dependency)(rate(demo_dependency_duration_seconds_sum{service_name=~\"order-service|payment-service|inventory-service|product-service\"}[1m]))/sum by(service_name,dependency)(rate(demo_dependency_duration_seconds_count{service_name=~\"order-service|payment-service|inventory-service|product-service\"}[1m]))",
+          "unit": "seconds",
+          "series": [
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0.004564531000000001"
+                ],
+                [
+                  1789805880,
+                  "0.0056651725714285716"
+                ],
+                [
+                  1789805885,
+                  "0.005460645791666667"
+                ],
+                [
+                  1789805890,
+                  "0.0055313106060606064"
+                ],
+                [
+                  1789805895,
+                  "0.004878410052631575"
+                ],
+                [
+                  1789805900,
+                  "0.00436926162790698"
+                ],
+                [
+                  1789805905,
+                  "0.003971093729166669"
+                ],
+                [
+                  1789805910,
+                  "0.0037684397962963016"
+                ],
+                [
+                  1789805915,
+                  "0.005209012375000006"
+                ],
+                [
+                  1789805920,
+                  "0.006752140041666672"
+                ],
+                [
+                  1789805925,
+                  "0.006752140041666672"
+                ],
+                [
+                  1789805930,
+                  "0.006880822926470593"
+                ],
+                [
+                  1789805935,
+                  "0.007014511500000007"
+                ],
+                [
+                  1789805940,
+                  "0.007397887166666674"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0.0027027400399999998"
+                ],
+                [
+                  1789805880,
+                  "0.0025011116799999998"
+                ],
+                [
+                  1789805885,
+                  "0.0024607394933333334"
+                ],
+                [
+                  1789805890,
+                  "0.004567741780163042"
+                ],
+                [
+                  1789805895,
+                  "0.004307069222"
+                ],
+                [
+                  1789805900,
+                  "0.004074055272609289"
+                ],
+                [
+                  1789805905,
+                  "0.004104353792933333"
+                ],
+                [
+                  1789805910,
+                  "0.0044547154629933335"
+                ],
+                [
+                  1789805915,
+                  "0.0051247352058699115"
+                ],
+                [
+                  1789805920,
+                  "0.005635804256779651"
+                ],
+                [
+                  1789805925,
+                  "0.005636183791538247"
+                ],
+                [
+                  1789805930,
+                  "0.006212946899088687"
+                ],
+                [
+                  1789805935,
+                  "0.006972056228571431"
+                ],
+                [
+                  1789805940,
+                  "0.007970330382608698"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "NaN"
+                ],
+                [
+                  1789805880,
+                  "NaN"
+                ],
+                [
+                  1789805885,
+                  "NaN"
+                ],
+                [
+                  1789805890,
+                  "NaN"
+                ],
+                [
+                  1789805895,
+                  "NaN"
+                ],
+                [
+                  1789805900,
+                  "NaN"
+                ],
+                [
+                  1789805905,
+                  "NaN"
+                ],
+                [
+                  1789805910,
+                  "NaN"
+                ],
+                [
+                  1789805915,
+                  "NaN"
+                ],
+                [
+                  1789805920,
+                  "NaN"
+                ],
+                [
+                  1789805925,
+                  "NaN"
+                ],
+                [
+                  1789805930,
+                  "NaN"
+                ],
+                [
+                  1789805935,
+                  "NaN"
+                ],
+                [
+                  1789805940,
+                  "NaN"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "mysql",
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "NaN"
+                ],
+                [
+                  1789805880,
+                  "NaN"
+                ],
+                [
+                  1789805885,
+                  "NaN"
+                ],
+                [
+                  1789805890,
+                  "NaN"
+                ],
+                [
+                  1789805895,
+                  "NaN"
+                ],
+                [
+                  1789805900,
+                  "NaN"
+                ],
+                [
+                  1789805905,
+                  "NaN"
+                ],
+                [
+                  1789805910,
+                  "NaN"
+                ],
+                [
+                  1789805915,
+                  "NaN"
+                ],
+                [
+                  1789805920,
+                  "NaN"
+                ],
+                [
+                  1789805925,
+                  "NaN"
+                ],
+                [
+                  1789805930,
+                  "NaN"
+                ],
+                [
+                  1789805935,
+                  "NaN"
+                ],
+                [
+                  1789805940,
+                  "NaN"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "dependency": "redis",
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "NaN"
+                ],
+                [
+                  1789805870,
+                  "NaN"
+                ],
+                [
+                  1789805875,
+                  "0.00026212466666666694"
+                ],
+                [
+                  1789805880,
+                  "0.00030320287500000016"
+                ],
+                [
+                  1789805885,
+                  "0.0002834133846153847"
+                ],
+                [
+                  1789805890,
+                  "0.00027840038888888886"
+                ],
+                [
+                  1789805895,
+                  "0.0002731485217391304"
+                ],
+                [
+                  1789805900,
+                  "0.0002756368928571429"
+                ],
+                [
+                  1789805905,
+                  "0.00026978278787878786"
+                ],
+                [
+                  1789805910,
+                  "0.0002658662105263158"
+                ],
+                [
+                  1789805915,
+                  "0.00039571609302325577"
+                ],
+                [
+                  1789805920,
+                  "0.00038409421739130426"
+                ],
+                [
+                  1789805925,
+                  "0.0003840942173913043"
+                ],
+                [
+                  1789805930,
+                  "0.00039260372093023255"
+                ],
+                [
+                  1789805935,
+                  "0.0004011239736842105"
+                ],
+                [
+                  1789805940,
+                  "0.00042375636363636355"
+                ]
+              ]
+            }
+          ],
+          "status": "available"
+        }
+      },
+      {
+        "evidence_id": "M-4485a996f5bfae04",
+        "data": {
+          "name": "fallback_rate",
+          "query": "sum by(service_name)(rate(demo_fallback_total{service_name=~\"order-service|payment-service|inventory-service|product-service\"}[1m]))",
+          "unit": "fallbacks/second",
+          "series": [
+            {
+              "metric": {
+                "service_name": "inventory-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "order-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "payment-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "service_name": "product-service"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "0"
+                ],
+                [
+                  1789805870,
+                  "0"
+                ],
+                [
+                  1789805875,
+                  "0"
+                ],
+                [
+                  1789805880,
+                  "0"
+                ],
+                [
+                  1789805885,
+                  "0"
+                ],
+                [
+                  1789805890,
+                  "0"
+                ],
+                [
+                  1789805895,
+                  "0"
+                ],
+                [
+                  1789805900,
+                  "0"
+                ],
+                [
+                  1789805905,
+                  "0"
+                ],
+                [
+                  1789805910,
+                  "0"
+                ],
+                [
+                  1789805915,
+                  "0"
+                ],
+                [
+                  1789805920,
+                  "0"
+                ],
+                [
+                  1789805925,
+                  "0"
+                ],
+                [
+                  1789805930,
+                  "0"
+                ],
+                [
+                  1789805935,
+                  "0"
+                ],
+                [
+                  1789805940,
+                  "0"
+                ]
+              ]
+            }
+          ],
+          "status": "available"
+        }
+      },
+      {
+        "evidence_id": "M-5de9295cd3fbadc1",
+        "data": {
+          "name": "scrape_up",
+          "query": "up{job=\"go-services\"}",
+          "unit": "boolean",
+          "series": [
+            {
+              "metric": {
+                "__name__": "up",
+                "instance": "inventory-service:8080",
+                "job": "go-services"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "1"
+                ],
+                [
+                  1789805870,
+                  "1"
+                ],
+                [
+                  1789805875,
+                  "1"
+                ],
+                [
+                  1789805880,
+                  "1"
+                ],
+                [
+                  1789805885,
+                  "1"
+                ],
+                [
+                  1789805890,
+                  "1"
+                ],
+                [
+                  1789805895,
+                  "1"
+                ],
+                [
+                  1789805900,
+                  "1"
+                ],
+                [
+                  1789805905,
+                  "1"
+                ],
+                [
+                  1789805910,
+                  "1"
+                ],
+                [
+                  1789805915,
+                  "1"
+                ],
+                [
+                  1789805920,
+                  "1"
+                ],
+                [
+                  1789805925,
+                  "1"
+                ],
+                [
+                  1789805930,
+                  "1"
+                ],
+                [
+                  1789805935,
+                  "1"
+                ],
+                [
+                  1789805940,
+                  "1"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "__name__": "up",
+                "instance": "order-service:8080",
+                "job": "go-services"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "1"
+                ],
+                [
+                  1789805870,
+                  "1"
+                ],
+                [
+                  1789805875,
+                  "1"
+                ],
+                [
+                  1789805880,
+                  "1"
+                ],
+                [
+                  1789805885,
+                  "1"
+                ],
+                [
+                  1789805890,
+                  "1"
+                ],
+                [
+                  1789805895,
+                  "1"
+                ],
+                [
+                  1789805900,
+                  "1"
+                ],
+                [
+                  1789805905,
+                  "1"
+                ],
+                [
+                  1789805910,
+                  "1"
+                ],
+                [
+                  1789805915,
+                  "1"
+                ],
+                [
+                  1789805920,
+                  "1"
+                ],
+                [
+                  1789805925,
+                  "1"
+                ],
+                [
+                  1789805930,
+                  "1"
+                ],
+                [
+                  1789805935,
+                  "1"
+                ],
+                [
+                  1789805940,
+                  "1"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "__name__": "up",
+                "instance": "payment-service:8080",
+                "job": "go-services"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "1"
+                ],
+                [
+                  1789805870,
+                  "1"
+                ],
+                [
+                  1789805875,
+                  "1"
+                ],
+                [
+                  1789805880,
+                  "1"
+                ],
+                [
+                  1789805885,
+                  "1"
+                ],
+                [
+                  1789805890,
+                  "1"
+                ],
+                [
+                  1789805895,
+                  "1"
+                ],
+                [
+                  1789805900,
+                  "1"
+                ],
+                [
+                  1789805905,
+                  "1"
+                ],
+                [
+                  1789805910,
+                  "1"
+                ],
+                [
+                  1789805915,
+                  "1"
+                ],
+                [
+                  1789805920,
+                  "1"
+                ],
+                [
+                  1789805925,
+                  "1"
+                ],
+                [
+                  1789805930,
+                  "1"
+                ],
+                [
+                  1789805935,
+                  "1"
+                ],
+                [
+                  1789805940,
+                  "1"
+                ]
+              ]
+            },
+            {
+              "metric": {
+                "__name__": "up",
+                "instance": "product-service:8080",
+                "job": "go-services"
+              },
+              "values": [
+                [
+                  1789805865,
+                  "1"
+                ],
+                [
+                  1789805870,
+                  "1"
+                ],
+                [
+                  1789805875,
+                  "1"
+                ],
+                [
+                  1789805880,
+                  "1"
+                ],
+                [
+                  1789805885,
+                  "1"
+                ],
+                [
+                  1789805890,
+                  "1"
+                ],
+                [
+                  1789805895,
+                  "1"
+                ],
+                [
+                  1789805900,
+                  "1"
+                ],
+                [
+                  1789805905,
+                  "1"
+                ],
+                [
+                  1789805910,
+                  "1"
+                ],
+                [
+                  1789805915,
+                  "1"
+                ],
+                [
+                  1789805920,
+                  "1"
+                ],
+                [
+                  1789805925,
+                  "1"
+                ],
+                [
+                  1789805930,
+                  "1"
+                ],
+                [
+                  1789805935,
+                  "1"
+                ],
+                [
+                  1789805940,
+                  "1"
+                ]
+              ]
+            }
+          ],
+          "status": "available"
+        }
+      }
+    ],
+    "status": "available",
+    "truncated": false,
+    "limitations": [
+      "Metrics are service/window correlated, never joined by TraceId or order ID.",
+      "NaN, missing series and zero traffic are not equivalent to 0% errors.",
+      "Single clicks and short windows do not establish statistically reliable P95; rolling 1m windows overlap phases.",
+      "scrape_up covers all four services for dependency availability context."
+    ],
+    "source": "metrics",
+    "window": {
+      "start": "2026-09-19T08:17:45+00:00",
+      "end": "2026-09-19T08:19:00+00:00"
+    },
+    "collected_at": "2026-09-19T08:20:35.609416+00:00"
+  }
+}

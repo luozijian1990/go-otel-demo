@@ -14,6 +14,7 @@ import (
 	redisstore "go-otel-demo/service-a/internal/redis"
 
 	"github.com/gin-gonic/gin"
+	"go-otel-demo/service-a/internal/exercise"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -47,6 +48,7 @@ func TraceIDHeaderMiddleware() gin.HandlerFunc {
 }
 
 func (h *Handler) Register(router *gin.Engine) {
+	h.registerExercise(router)
 	router.GET("/health", h.Health)
 	router.GET("/ok", h.OK)
 	router.GET("/error", h.Error)
@@ -68,6 +70,10 @@ func (h *Handler) Register(router *gin.Engine) {
 	router.GET("/chain/fanout/error", h.ChainFanoutError)
 	router.GET("/chain/slow/redis", h.ChainSlowRedis)
 	router.GET("/chain/degrade/ok", h.ChainDegradeOK)
+}
+
+func (h *Handler) registerExercise(router *gin.Engine) {
+	exercise.Register(router, h.cfg.Server.Name, []string{h.cfg.Peer.ServiceBURL}, nil)
 }
 
 func (h *Handler) Health(c *gin.Context) {

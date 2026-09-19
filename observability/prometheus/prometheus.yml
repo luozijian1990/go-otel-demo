@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+scrape_configs:
+  - job_name: go-services
+    static_configs:
+      - targets: [order-service:8080, payment-service:8080, product-service:8080, inventory-service:8080]

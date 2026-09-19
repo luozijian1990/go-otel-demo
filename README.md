@@ -1,175 +1,129 @@
-# Go OpenTelemetry Demo
+# Commerce Incident Lab
 
-用四个 Go 服务练习接入 OpenTelemetry：从浏览器发起请求，让 TraceContext 穿过 Traefik、多个 Gin 服务和 MySQL/Redis 调用，经 OTel Collector 采样后在 Jaeger 查看完整链路。项目还提供一个操作台，用来制造错误或慢请求，再把 TraceId 交给 AI 定位问题。
+一个基于四个 Go 业务服务的故障排障 Demo：在 UI 触发商品、库存、订单或支付异常，用三个观测 Skill 查询真实 Jaeger / Loki / Prometheus，再由综合 Skill 结合应用关系 reference 形成诊断。
 
-![请求、采样与 TraceId 定位流程](docs/images/request-trace-flow.png)
+**当前运行架构不再包含 aiops-api、模型 HTTP adapter、自动评分或 SQLite 实验平台。** 分析发生在你的 AI 会话中，无需给网页配置模型 key。
 
-[打开可交互流程图](docs/diagrams/workflow.html) · [查看系统架构图](docs/diagrams/architecture.html)
-
-## 这份 Demo 展示什么
-
-- **Go 如何产生 span**：四个服务的 Dockerfile 使用 `otel go build` 编译，借助 LoongSuite Go Agent 为 Gin、HTTP 客户端、GORM/MySQL 等调用注入埋点；Compose 中的 `OTEL_*` 环境变量配置导出地址、采样器和传播格式。业务代码不手动初始化 TracerProvider。
-- **一条 trace 如何跨服务**：请求进入 Traefik 后到 `service-a`；复杂场景继续调用 `service-b`，再到 `service-c`（Redis）或 `service-d`（MySQL）。HTTP 调用传播 W3C TraceContext，相关 span 因而可以在 Jaeger 中串成同一条调用链。
-- **为什么有 TraceId 却查不到 trace**：服务可以在响应中返回 TraceId，但 Collector 的 tail sampling 要等请求结束后再决定是否保留。5xx、ERROR span 和超过 3 秒的慢请求优先保留；普通成功请求仅抽样约 1%。规则见 [`otel/collector.yaml`](otel/collector.yaml)。
-
-## 为什么让 Traefik 做入口
-
-Traefik 在这里模拟应用前面的网关：使用操作台时，浏览器通过 `localhost:18086` 进入，由它按 Host 和路径把 `/ui` 送到静态页面容器、把 `/service-a/...` 送到 Go 服务。这样 UI 的 `fetch('/service-a/...')` 与页面同源，也能观察请求进入业务服务之前的路由、耗时和状态码。
-
-一条从操作台发起的 API 请求会这样经过入口：
-
-1. [`docker-compose.yml`](docker-compose.yml) 把宿主机 `18086` 映射到 Traefik 容器的 `80`；[`traefik/traefik.yaml`](traefik/traefik.yaml) 把 `:80` 定义为 `web` entryPoint。
-2. [`traefik/dynamic.yaml`](traefik/dynamic.yaml) 同时检查 Host（`localhost` 或 `127.0.0.1`）和 `/service-a` 路径前缀，去掉该前缀后转发到 `http://service-a:8080`。例如网关收到 `/service-a/chain/mysql/error`，Go 服务处理的是 `/chain/mysql/error`。
-3. Traefik 的 `tracing` 配置启用 OTel，服务名为 `traefik`，通过 OTLP gRPC 把网关 span 发往 `otel-collector:4317`。它在入口创建或续接请求的 trace，通过 W3C `traceparent` 请求头把同一个 TraceId 传给 `service-a`；后续 Go 服务继续传播。`sampleRate: 1.0` 表示入口追踪每次请求，最终是否进入 Jaeger 仍由 Collector 的尾部采样决定。参见 [Traefik v3.4 的 OTel tracing 文档](https://doc.traefik.io/traefik/v3.4/observability/tracing/opentelemetry/)。
-
-同一个 TraceId 有两个便于核对的出口。Traefik 把它写入 `logs/traefik/access.log` 的 JSON `TraceId` 字段，旁边还有 `RequestPath`、`DownstreamStatus` 等网关信息；Go 服务的 `TraceIDHeaderMiddleware` 在取得有效 span 时把 ID 写入 `X-Trace-Id`，错误响应也可能写入 JSON 的 `trace_id`。页面先读响应头，若响应体有 `trace_id` 则显示响应体中的值。**响应头和页面上的 ID 来自 Go 服务，并非 Traefik 直接添加。**
-
-加载 `/ui` 和点击一个场景是两次独立 HTTP 请求，因此会有不同的 TraceId。排查时使用**场景 API 请求**显示的 ID；它应与 Traefik 对应路径的 access log、Jaeger 中的网关 span 和下游服务 span 一致。若安装了 `jq`，可以查看最近一条该场景的网关日志：
+## 快速开始
 
 ```bash
-jq -c 'select(.RequestPath == "/service-a/chain/mysql/error") | {TraceId, DownstreamStatus, RouterName}' logs/traefik/access.log | tail -1
+bash scripts/init-demo-env.sh
+docker compose config --quiet
+docker compose up --build -d --wait
 ```
 
-## Go 服务怎样接入 OTel
+打开 [业务故障实验室](http://localhost:18086/ui)，或 [Nginx 直接入口](http://localhost:18083)。
 
-本项目选择 **LoongSuite Go Agent 的编译期自动埋点**。它不是在 `main.go` 中手动创建 TracerProvider 的示例：Agent 负责常见框架和依赖调用的 span，业务代码只在需要表达错误、特殊耗时或返回 TraceId 时使用 OTel API。接入过程可以按下面五步读。
+首次构建需要访问镜像仓库、GitHub 和 Go 模块代理。四服务都使用 LoongSuite `v1.10.0` 的 `otel go build`；没有初始化第二个 tracing SDK。默认本地 MySQL/Redis 随 Compose 启动；数据库表由各自业务服务创建，演示商品为 `SKU-001`，金额单位为分。
 
-1. **用 Agent 编译服务。** 四个服务的 [`Dockerfile`](service-a/Dockerfile) 先下载 `otel` 命令，再用它包装 Go 编译：
+历史本地 `service-*/config.yaml` 文件原样保留，**新业务入口不读取它们**。如需明确连接另一套依赖，在私有 `.env` 中设置 `BUSINESS_MYSQL_DSN`、`BUSINESS_REDIS_ADDR`、`BUSINESS_REDIS_PASSWORD`，并确认目标允许创建演示表；不要对生产数据库运行。
 
-   ```dockerfile
-   RUN CGO_ENABLED=0 GOOS=linux otel go build -o /out/server ./cmd
-   ```
+## 使用流程
 
-   这里的 `otel go build` 是自动埋点入口；改成普通 `go build`，就不会得到本项目依赖的编译期注入。具体支持哪些库由 Agent 版本决定，本项目重点观察 Gin、`net/http`、GORM/MySQL 和 Redis。可参考 [LoongSuite Go Agent 文档](https://github.com/alibaba/loongsuite-go/blob/main/README.md)。
+1. 选择商品浏览、库存操作、提交订单或确认支付，点击“模拟异常”；每类也有正常对照。
+2. 点击“随机模拟一次故障”会随机选择业务和故障；也可选某类业务。默认只发一条主业务调用，不再跑正常预检或持续流量。
+3. “本次调用链”直接读取这次 TraceId 的 Jaeger spans，展示实际父子关系、服务、耗时、HTTP 状态及异常。尾部采样未完成时显示采集中，最多重试 45 秒；没有执行的下游不会补画。支付建单准备、下单成功清理有独立 TraceId，不混入主链路。
+4. 查看真实状态、请求 ID 和业务 TraceId，点击“复制排障上下文”。
+5. 在支持本地 Skills 的 AI 会话中粘贴，使用 `$aiops-incident-rootcause`。
+6. 综合 Skill 读取应用关系 reference，按需使用 Jaeger、Loki、Prometheus 三个 Skill，输出原因、传播、影响、证据与不确定性。
+7. 分析完成后，手动“揭晓本次故障”核对。真实注入控制和回执不进入复制内容或 Skill 查询结果。
 
-2. **在运行时指定服务身份和出口。** [`docker-compose.yml`](docker-compose.yml) 给每个 Go 容器设置同一组 `OTEL_*` 变量，只把 `OTEL_SERVICE_NAME` 换成各自的服务名。以 `service-a` 为例：
+“下单异常”不等于“订单服务就是根因”：下游商品或库存同样可能影响下单。单次点击适合 trace/log 定位，但不能据此宣称指标趋势。后端保留显式 window 参数用于兼容旧测试，页面不再默认启动窗口。
 
-   ```yaml
-   environment:
-     - OTEL_SERVICE_NAME=service-a
-     - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-     - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-     - OTEL_EXPORTER_OTLP_INSECURE=true
-     - OTEL_TRACES_SAMPLER=parentbased_always_on
-     - OTEL_PROPAGATORS=tracecontext,baggage
-   ```
+网页不会自动调用模型或展示预制 AI 答案。综合 Skill 不读取故障目录或答案接口，也不执行自动修复。当前开发会话具备源码背景，因此开发中的诊断示例不是严格黑盒盲测。
 
-   `service.name` 让 Jaeger 区分各服务；OTLP gRPC 把 span 发往 Compose 网络中的 Collector；`tracecontext` 用于 HTTP 跨服务传播。应用侧的 `parentbased_always_on` 与 Collector 的尾部采样是两个不同阶段：前者决定服务是否记录 span，后者决定收到整条 trace 后是否保留。各服务 `config.yaml` 虽仍有 `otel` 字段，当前 `main.go` 并不拿它初始化 SDK；修改导出地址应改 `OTEL_*` 环境变量。
+已完成 [两个独立 subagent 测试](docs/observations/single-call-subagent-validation.md)：一个只拿 TraceId，另一个只拿“订单调用库存功能故障”的描述；两者使用全新上下文，报告保存后才读取答案对照。第二个自行发现了同一故障 TraceId。它们是同一次故障的两种输入方式验证，不是准确率 benchmark。
 
-3. **把请求 `context` 带到下游。** [`service-a/internal/client/client.go`](service-a/internal/client/client.go) 用 `http.NewRequestWithContext` 创建请求。编译期埋点会在出站 HTTP 请求中传播上下文，下游服务继续使用同一个 TraceId：
+## 四个业务服务
 
-   ```go
-   req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
-   // 检查 err 后，通过 http.Client.Do(req) 发出请求。
-   ```
-
-   业务调用若丢掉入站请求的 `context`，跨服务 span 就可能无法接到原调用链上。这个 Demo 的 `service-a → service-b → service-d` 路径可以用来检查传播是否成功。
-
-4. **补充自动埋点不知道的业务信息。** HTTP、SQL 等调用 span 由 Agent 产生；代码会对业务失败调用 `RecordError` 和 `SetStatus(codes.Error, ...)`，例如 [`service-a/internal/handler/handler.go`](service-a/internal/handler/handler.go)。`service-c` 还手动创建了一个用于演示 4 秒等待的 `redis synthetic slow operation` span。`TraceIDHeaderMiddleware` 从当前请求上下文提取 TraceId，写入 `X-Trace-Id` 响应头；错误响应也可能在 JSON 中携带 `trace_id`。
-
-5. **让 Collector 接收、筛选并导出。** [`otel/collector.yaml`](otel/collector.yaml) 的 `traces` pipeline 是 `OTLP receiver → tail_sampling → batch → Jaeger exporter`。Jaeger 是查询与展示端，不是 Go 服务直接连接的地址。
-
-把同样方式用到自己的 Go HTTP 服务时，先确认 Agent 支持所用框架和依赖，再用 `otel go build` 编译、设置唯一的 `OTEL_SERVICE_NAME` 和正确的 Collector 地址、传递请求 `context`，最后用一个确定会被保留的错误或慢请求验证。新增到本项目的服务还需要加入 Compose；若要从网关直接访问，再添加 Traefik 路由。
-
-启动本项目后，可用下面的请求验收最短链路。复制响应头 `X-Trace-Id` 或错误 JSON 中的 `trace_id`，约 10–12 秒后在 Jaeger 按 TraceId 查找；预期能看到 Traefik 和 `service-a` 的 span。再请求 `/service-a/chain/mysql/error`，可验证跨服务传播及 MySQL span。
-
-```bash
-curl -i http://localhost:18086/service-a/error
-```
-
-> [!NOTE]
-> 这是本地教学环境。Traefik dashboard 使用不安全模式；MySQL、Redis、RabbitMQ 由你在 Compose 外准备。RabbitMQ 未启动不影响服务启动，但相关请求会失败。
-
-## 快速运行
-
-需要 Docker Compose，以及可从容器访问的 MySQL 和 Redis；仅用 Docker 运行时无需在宿主机安装 Go。镜像构建会从 GitHub 下载 LoongSuite Go Agent，并通过 Dockerfile 中配置的 Go 代理下载依赖。先在 MySQL 创建数据库；表由服务启动时自动创建：
-
-```sql
-CREATE DATABASE otel_demo DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-四个服务各有一份脱敏的 `config.example.yaml`。复制为本地 `config.yaml`，填写 MySQL、Redis，以及需要演示 RabbitMQ 时的连接信息。已有本地配置会被保留；`config.yaml` 已被 Git 和 Docker 构建上下文忽略。
-
-```bash
-for service in service-a service-b service-c service-d; do
-  if [ ! -f "$service/config.yaml" ]; then
-    cp "$service/config.example.yaml" "$service/config.yaml"
-  fi
-done
-# 编辑各服务的 config.yaml，然后启动
-docker compose up --build -d
-```
-
-示例中的 `host.docker.internal` 表示容器访问宿主机；请按实际数据库地址和端口修改。`service-a`、`service-b`、`service-d` 需要 MySQL；`service-a`、`service-b`、`service-c` 需要 Redis。MySQL 和 Redis 不在本项目的 Compose 文件中。
-
-启动后访问：
-
-| 入口 | 地址 |
-| --- | --- |
-| 故障实验操作台 | <http://localhost:18086/ui> |
-| Jaeger | <http://localhost:16686> |
-| Traefik dashboard | <http://localhost:18082/dashboard/> |
-
-Traefik API 路由要求 Host 为 `localhost` 或 `127.0.0.1`。也可以用命令行验证入口：
-
-```bash
-curl -i http://localhost:18086/service-a/health
-curl -i http://localhost:18086/service-a/chain/mysql/error
-```
-
-## 从 UI 的错误到 AI 根因分析
-
-1. 打开 [故障实验操作台](http://localhost:18086/ui)，在「复杂链路」中点击 **Chain MySQL Error**。该场景故意让 `service-d` 查询不存在的表。
-2. 右侧会显示 HTTP 500、响应内容和 TraceId。点击「复制 TraceId」；等待约 10–12 秒，让 Collector 完成 tail sampling，再查看 Jaeger。
-3. 在支持仓库本地 Skill 的 AI 会话中，进入本项目目录并这样提问，把占位符换成**刚从页面复制**的 TraceId：
-
-   ```text
-   $jaeger-trace-rootcause 请分析 TraceId <从页面复制的TraceId>。
-   连接本地 Jaeger，沿调用链找出最深的失败 span、错误原因，
-   并说明 Traefik 的 500 是根因还是下游错误的传播。
-   ```
-
-![操作台中的 Chain MySQL Error：HTTP 500、TraceId 与响应内容](docs/images/demo-ui-error.png)
-
-这张截图来自一次真实运行。对应 trace 经 Jaeger 核对后的调用链是 `Traefik → service-a → service-b → service-d → MySQL`；最深的失败 span 是 `service-d` 的 `SELECT users_table_that_does_not_exist`，错误是 MySQL 1146（表不存在）。Traefik 的 500 是下游错误向入口传播的结果。截图中的 TraceId 属于一次临时运行，Jaeger 重启后可能查不到，请使用自己刚生成的 TraceId。
-
-仓库内的 [Jaeger 根因分析 Skill](.agents/skills/jaeger-trace-rootcause/SKILL.md) 自带[分析脚本](.agents/skills/jaeger-trace-rootcause/scripts/analyze-jaeger-trace.py)，会按 TraceId 调用本地 Jaeger API，清洗 span 数据后给出「结论、证据、调用链、下一步」。不用 Skill 时仍可运行仓库根目录保留的命令行脚本：
-
-```bash
-python3 scripts/analyze-jaeger-trace.py --trace-id TRACE_ID_FROM_UI
-```
-
-> [!TIP]
-> 想演示性能排查，可点击 **Chain Slow Redis**，再让 AI 找出耗时最长的 span。普通 `/ok` 请求可能被 1% 采样丢弃，首次体验建议先选错误或慢请求。
-
-## 接下来可以做的实验
-
-| UI 场景 | 预期响应 | 在 Jaeger 中重点看什么 |
+| 业务服务 | 实际职责与调用 | 源码入口 |
 | --- | --- | --- |
-| **Error 5xx** | 500 | 单服务错误 span 如何使整条 trace 被保留 |
-| **Chain MySQL Error** | 500 | `service-a → service-b → service-d` 的父子关系，以及最深处的失败 SQL span |
-| **Chain Slow Redis** | 200（依赖可用时） | `service-c` 的合成慢操作 span（含 4 秒等待与 Redis 调用）；超过 3 秒的 trace 如何被保留 |
-| **Chain Degrade OK** | 200（MySQL 可用时） | 入口成功，但 Redis 分支有 ERROR span，仍会被错误策略保留 |
+| product-service | 商品资料、价格；Redis 缓存，缺失或失败时 MySQL 回源 | service-c/cmd |
+| inventory-service | 库存查询、事务预占、释放、确认 | service-d/cmd |
+| order-service | 商品价格确认 → 库存预占 → 订单；支付编排与补偿 | service-a/cmd |
+| payment-service | 本地支付记录，按订单幂等；不连接真实支付渠道 | service-b/cmd |
 
-## 常见问题
+共享业务实现位于 [commerce/](commerce/)，包括路由、数据模型、事务和遥测。四个独立 Go module 是薄进程入口，通过 replace 引用共享模块；根 [Dockerfile](Dockerfile) 使用仓库根目录构建上下文。保留物理 service-a/b/c/d 目录是为了避免破坏本地配置和迁移历史，运行时服务身份已经是业务名称。
 
-| 现象 | 先检查 |
+每个服务只读写自己的 `commerce_*` 表。库存事务避免重复扣减/释放，支付按 order_id 幂等。订单收到明确支付失败后释放库存；网络结果未知时保留库存并记录 payment_unknown，允许幂等重试。补偿失败标 reconciliation_required。单实例编排有串行保护，**不声称实现了生产分布式事务或完整对账系统**。
+
+| API | 用途 |
 | --- | --- |
-| Go 服务启动失败 | `docker compose logs service-a service-b service-d`；检查三份 MySQL DSN、数据库是否已创建，以及容器能否访问数据库。 |
-| Docker 构建下载失败 | 检查能否访问 Dockerfile 中的 GitHub Agent 下载地址和 Go 代理。 |
-| 页面有 TraceId，Jaeger 暂时查不到 | 等待约 10–12 秒；普通成功请求可能被采样丢弃。先用 5xx 或慢请求重试，再看 `docker compose logs otel-collector`。 |
-| 通过网关访问返回 404 | 使用 `http://localhost:18086/ui` 或 `http://127.0.0.1:18086/ui`；Traefik 仅匹配这两个 Host。 |
+| GET /products/SKU-001 | 商品读取 |
+| GET /inventory/SKU-001 | 库存读取 |
+| POST /orders | JSON：id、sku、quantity |
+| GET /orders/:id | 订单状态 |
+| POST /orders/:id/pay | 本地支付与库存确认 |
+| POST /orders/:id/cancel | 取消待支付订单并释放库存 |
+| POST /reservations | 库存预占：order_id、sku、quantity |
+| POST /reservations/:id/release、confirm | 释放或确认预占 |
+| POST /payments | 本地支付记录：order_id、amount_cents |
 
-## 代码与配置从哪里读起
+## 四个 Skill
 
-| 想了解 | 入口 |
+| Skill | 工作内容 |
 | --- | --- |
-| Go 服务启动、HTTP 退出与资源释放 | `service-{a,b,c,d}/cmd/main.go` |
-| TraceId 如何出现在响应中 | `service-a/internal/handler/handler.go` 的 `TraceIDHeaderMiddleware` |
-| 跨服务 HTTP 调用 | `service-a/internal/client/client.go`、`service-b/internal/client/client.go` |
-| 自动埋点的编译方式 | 四个服务的 `Dockerfile` |
-| OTLP 导出与服务编排 | [`docker-compose.yml`](docker-compose.yml) |
-| Collector 的接收、tail sampling 和导出 | [`otel/collector.yaml`](otel/collector.yaml) |
-| Traefik 的 Host 与路径路由 | [`traefik/dynamic.yaml`](traefik/dynamic.yaml) |
+| [jaeger-trace-rootcause](.agents/skills/jaeger-trace-rootcause/SKILL.md) | 根据 TraceId 或服务/时间查询真实调用链，分析传播、慢分支与缺失证据 |
+| [loki-incident-logs](.agents/skills/loki-incident-logs/SKILL.md) | 查询具体错误、业务状态、缓存回源、库存补偿 |
+| [prometheus-incident-metrics](.agents/skills/prometheus-incident-metrics/SKILL.md) | 比较请求量、错误率、延迟、依赖失败与 fallback |
+| [aiops-incident-rootcause](.agents/skills/aiops-incident-rootcause/SKILL.md) | 串联前三者，结合应用关系形成有证据的综合判断 |
 
-项目目录中的 `docs/presentations/` 是教学幻灯片，`docs/diagrams/` 保留 Archify 可交互图及 JSON 源文件，`scripts/trace-demo.sh` 可批量造流量。四个 Go 服务是独立 Go module；如需验证代码，分别进入服务目录运行 `go test ./...`。
+综合 Skill 的 [application-map.md](.agents/skills/aiops-incident-rootcause/references/application-map.md) 模拟 CMDB：职责、正常调用关系、存储、状态语义、遥测标签和查询端点。它不包含场景到答案的映射，不能替代实时证据。
+
+三个查询脚本只依赖 Python 标准库，统一返回查询、UTC 窗口、证据 ID、来源、状态和限制：
+
+```bash
+python3 .agents/skills/jaeger-trace-rootcause/scripts/query.py --trace-id TRACE_ID --wait 20
+python3 .agents/skills/loki-incident-logs/scripts/query.py --trace-id TRACE_ID --start START_UTC --end END_UTC
+python3 .agents/skills/prometheus-incident-metrics/scripts/query.py --service order-service --start START_UTC --end END_UTC
+```
+
+无 TraceId 时，Jaeger 可按 `--service` 与时间检索，Loki 支持 `--request-id`、`--run-id` 或服务/时间关联。默认回看 300 秒，时间范围最多 1 小时；查询不跟随重定向、限制返回量，并脱敏凭据/控制字段。Loki 长窗口截断时要缩小范围或按代表 TraceId 查询，不能把最早的基线日志当故障证据。
+
+旧 Jaeger CLI 仍可用：`python3 scripts/analyze-jaeger-trace.py --trace-id TRACE_ID`。两处兼容入口复用 `scripts/observability/trace_cleaner.py`。
+
+## 真实三信号
+
+- **Traces**：LoongSuite 自动埋点 → Collector 尾部采样 → Jaeger。错误及超过 3 秒 trace 优先保留，普通成功约 1%。普通事件不判错；exclusive time 合并并行子区间。请求返回 sampled 标志不代表一定已入库。
+- **Logs**：slog JSON 文件 → Collector filelog → Loki 原生 OTLP。只采文件，stdout 用于排障。仅 service_name 作索引，trace/request/run/order ID 留在 metadata。
+- **Metrics**：Prometheus 每 5 秒抓取各服务 /metrics。HTTP、实际依赖操作、fallback、inflight、Go/process 指标；不把任何单请求 ID 作为标签。应用等待与 SQL/Redis 操作分别计时。
+- 演示 driver 嵌入订单进程，每次业务请求独立起 trace，经真实 Traefik 转发；driver span 标记 `demo.traffic_driver=true`，不是订单业务根因。不会把创建演示控制请求的 TraceId 复制给诊断。
+
+| 观测入口 | 地址 |
+| --- | --- |
+| Jaeger | http://localhost:16686 |
+| Loki | http://localhost:13100/ready |
+| Prometheus | http://localhost:19090 |
+| Traefik | http://localhost:18082/dashboard/ |
+
+## 控制面与数据边界
+
+轻量控制面位于订单进程的独立 demo 模块，`POST /demo/runs` 接受 business、traffic（single/window）、mode（fault/healthy）。故障选择在服务端，只有一个活动演示，最多运行 120 秒；顺序发送、最大约 1 请求/秒，不积压队列。停止会取消后续请求。页面历史只保留进程内最近 100 次，重启不重放；这是有意移除实验平台后的简化。
+
+每次注入使用短期 HMAC token，只透传到固定业务下游。禁止跨主机重定向、任意 SQL/URL/shell；无全局 DSN/client 修改，不 DROP 表或 FLUSHDB。实际执行通过内部 receipt 确认，单独答案接口只供操作员核对。控制请求/答案不计入业务日志指标，不作为 Skill 证据。
+
+默认端口只绑定本机，控制写操作校验 Host、Origin、JSON。没有生产认证或租户隔离；远程部署必须另加认证。只允许在演示数据上运行。
+
+日志目录由短期 init 容器设置权限：应用 UID/GID 65532、0750；Collector UID 10001，加入日志只读组；应用和 Collector 均非 root。应用日志轮转 10 MiB、3 个备份；Collector offset 持久化。Loki 7 天；Prometheus 7 天/512 MiB。Jaeger 仍为内存存储，重建会丢 trace。普通 compose down 保留卷；down -v 会删除该项目卷，不要用于保留历史的场景。
+
+## 验证
+
+```bash
+(cd commerce && go test -race ./...)
+for service in service-a service-b service-c service-d; do
+  (cd "$service" && go test ./...) || exit 1
+done
+python3 -m unittest discover -s scripts -p '*_test.py'
+python3 scripts/smoke-commerce.py --controls
+docker compose config --quiet
+```
+
+smoke-commerce 使用真实业务接口验证幂等、支付失败与库存补偿、四类随机故障、独立 TraceId 和两入口代理，不调用模型；--controls 从私有 .env 读取本地签名 key，仅用于操作员测试，不是诊断 Skill。
+
+实际验证结果和环境差异见 [business-demo-validation.md](docs/observations/business-demo-validation.md)。
+
+## 从旧版本迁移
+
+旧独立 aiops-api 已从 Compose、UI、路由和当前 Skills 工作流移除，旧容器已停止并保留。自动审批拒绝大批量删除旧源码，因此 `aiops/`、旧 `service-*/internal`、旧服务 Dockerfile/config 示例和旧评测脚本暂作为历史源码保留；它们不被新进程入口注册或根 Dockerfile 打包。不要用旧 smoke-aiops/evaluate-aiops 测试当前业务版本。
+
+改造前完整源码备份：`/private/tmp/commerce-migration.80HSSf/before-business-refactor.tar.gz`，这是本机迁移备份，不是仓库运行依赖。用户原有 config.yaml、计划文档、存储卷未删除。当前运行入口以本 README 和根 docker-compose.yml 为准；旧架构图/历史验证记录描述旧版本。

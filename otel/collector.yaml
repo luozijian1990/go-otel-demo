@@ -1,5 +1,58 @@
 # 接收器：Traefik 和四个 Go 服务通过 OTLP 把 trace 发到 Collector。
 receivers:
+  filelog/apps:
+    include: [/var/log/*-service/app*.log]
+    start_at: beginning
+    storage: file_storage
+    operators:
+      - type: json_parser
+        parse_to: attributes
+        timestamp:
+          parse_from: attributes.timestamp
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+        severity:
+          parse_from: attributes.level
+        trace:
+          trace_id:
+            parse_from: attributes.trace_id
+          span_id:
+            parse_from: attributes.span_id
+      - type: move
+        from: attributes.service_name
+        to: resource["service.name"]
+      - type: move
+        from: attributes.message
+        to: body
+  filelog/gateway:
+    include: [/var/log/traefik/access.log]
+    # Existing host access logs may predate Loki retention; only tail new gateway requests.
+    start_at: end
+    storage: file_storage
+    operators:
+      - type: json_parser
+        parse_to: attributes
+        timestamp:
+          parse_from: attributes.StartUTC
+          layout_type: gotime
+          layout: '2006-01-02T15:04:05.999999999Z07:00'
+        trace:
+          trace_id:
+            parse_from: attributes.TraceId
+          span_id:
+            parse_from: attributes.SpanId
+      - type: filter
+        expr: 'attributes.RequestPath != nil and not (attributes.RequestPath matches "^/(products|inventory|reservations|orders|payments)(/|$)")'
+      - type: add
+        field: resource["service.name"]
+        value: traefik
+      - type: copy
+        from: attributes.TraceId
+        to: attributes.trace_id
+        if: 'attributes.TraceId != nil'
+      - type: add
+        field: body
+        value: gateway request completed
   otlp:
     protocols:
       # OTLP gRPC 入口，对应 Compose 中的 OTEL_EXPORTER_OTLP_ENDPOINT。
@@ -10,6 +63,14 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
+  transform/gateway:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["duration_ms"], Double(attributes["Duration"]) / 1000000) where resource.attributes["service.name"] == "traefik"
+          - set(attributes["http_route"], attributes["RequestPath"]) where resource.attributes["service.name"] == "traefik"
+          - set(attributes["http_status_code"], attributes["DownstreamStatus"]) where resource.attributes["service.name"] == "traefik"
   # 尾部采样：Collector 先收集完整 trace，再根据整条 trace 的状态决定是否保留。
   # 注意：tail_sampling 必须放在 batch 前面，否则采样决策可能不符合预期。
   tail_sampling:
@@ -56,6 +117,8 @@ processors:
     send_batch_size: 1024
 
 exporters:
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
   # 把采样后的 trace 通过 OTLP gRPC 转发给 Jaeger all-in-one。
   otlp/jaeger:
     endpoint: jaeger:4317
@@ -66,8 +129,17 @@ exporters:
   debug:
     verbosity: basic
 
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol
+
 service:
+  extensions: [file_storage]
   pipelines:
+    logs:
+      receivers: [filelog/apps, filelog/gateway]
+      processors: [transform/gateway, batch]
+      exporters: [otlphttp/loki]
     traces:
       # trace pipeline：接收 OTLP trace。
       receivers:

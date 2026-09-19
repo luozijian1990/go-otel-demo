@@ -1,0 +1,11 @@
+server:
+  name: service-d
+  port: 8080
+
+otel:
+  service_name: service-d
+  endpoint: otel-collector:4317
+  insecure: true
+
+mysql:
+  dsn: demo:demo-local-only@tcp(mysql:3306)/otel_demo?charset=utf8mb4&parseTime=True&loc=Local&timeout=5s&readTimeout=10s&writeTimeout=5s

@@ -1,4 +1,10 @@
 # Build artifacts
+.env
+.pytest_cache/
+.playwright-cli/
+output/playwright/
+*.sqlite*
+incident*.json
 *.exe
 *.dll
 *.so

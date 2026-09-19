@@ -1,0 +1,326 @@
+package commerce
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
+	"go-otel-demo/commerce/telemetry"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+	"log/slog"
+	"net/http"
+	"strings"
+	"time"
+)
+
+func bind(c *gin.Context, value any) bool {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 8192)
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(value) != nil {
+		c.AbortWithStatusJSON(400, gin.H{"error": "invalid JSON request"})
+		return false
+	}
+	return true
+}
+func (a *App) routes(r *gin.Engine) {
+	business := r.Group("", a.fault())
+	switch a.role {
+	case "product-service":
+		business.GET("/products/:sku", a.product)
+	case "inventory-service":
+		business.GET("/inventory/:sku", a.inventory)
+		business.POST("/reservations", a.reserveHandler)
+		business.POST("/reservations/:id/release", a.reservationHandler("released"))
+		business.POST("/reservations/:id/confirm", a.reservationHandler("confirmed"))
+	case "payment-service":
+		business.POST("/payments", a.charge)
+	case "order-service":
+		business.POST("/orders", a.createOrder)
+		business.GET("/orders/:id", a.getOrder)
+		business.POST("/orders/:id/pay", a.payOrder)
+		business.POST("/orders/:id/cancel", a.cancelOrder)
+	}
+}
+func (a *App) product(c *gin.Context) {
+	ctx := c.Request.Context()
+	sku := c.Param("sku")
+	if !validID.MatchString(sku) {
+		c.Status(400)
+		return
+	}
+	cache := a.cache
+	ctl, _ := c.Get("control")
+	control, _ := ctl.(control)
+	if control.Action == "cache_refused" && control.Target == a.role {
+		cache = redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", DialTimeout: 100 * time.Millisecond, ReadTimeout: 100 * time.Millisecond, MaxRetries: -1, DisableIdentity: true, ContextTimeoutEnabled: true})
+		defer cache.Close()
+	}
+	start := time.Now()
+	cached, err := cache.Get(ctx, "commerce:product:"+sku).Result()
+	telemetry.Observe(ctx, "redis", "get", start, func() error {
+		if errors.Is(err, redis.Nil) {
+			return nil
+		}
+		return err
+	}())
+	if control.Action == "cache_refused" {
+		setReceipt(c, receipt{a.role, control.Action, true, err != nil && containsRefused(err)})
+	}
+	if err == nil {
+		var p Product
+		if json.Unmarshal([]byte(cached), &p) == nil {
+			c.JSON(200, p)
+			return
+		}
+	}
+	if err != nil && !errors.Is(err, redis.Nil) {
+		telemetry.Fallback(ctx)
+	}
+	var p Product
+	if err := a.query(ctx, "product_lookup", func(db *gorm.DB) error { return db.First(&p, "sku = ?", sku).Error }); err != nil {
+		a.fail(c, err)
+		return
+	}
+	b, _ := json.Marshal(p)
+	// Do not retry the failed cache as part of serving fallback.
+	if err == nil || errors.Is(err, redis.Nil) {
+		start = time.Now()
+		e := a.cache.Set(ctx, "commerce:product:"+sku, b, time.Minute).Err()
+		telemetry.Observe(ctx, "redis", "set", start, e)
+	}
+	c.JSON(200, p)
+}
+func containsRefused(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "connection refused")
+}
+func (a *App) inventory(c *gin.Context) {
+	var stock Stock
+	if err := a.query(c.Request.Context(), "stock_lookup", func(db *gorm.DB) error { return db.First(&stock, "sku = ?", c.Param("sku")).Error }); err != nil {
+		a.fail(c, err)
+		return
+	}
+	c.JSON(200, stock)
+}
+func (a *App) reserveHandler(c *gin.Context) {
+	var r Reservation
+	if !bind(c, &r) {
+		return
+	}
+	if !validID.MatchString(r.OrderID) || !validID.MatchString(r.SKU) || r.Quantity < 1 || r.Quantity > 5 || r.State != "" {
+		c.Status(400)
+		return
+	}
+	if err := a.reserve(c.Request.Context(), r); err != nil {
+		a.fail(c, err)
+		return
+	}
+	r.State = "held"
+	c.JSON(200, r)
+}
+func (a *App) reservationHandler(state string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !validID.MatchString(c.Param("id")) {
+			c.Status(400)
+			return
+		}
+		if err := a.transition(c.Request.Context(), c.Param("id"), state); err != nil {
+			a.fail(c, err)
+			return
+		}
+		telemetry.Log(c.Request.Context(), slog.LevelInfo, "reservation state changed", "order_id", c.Param("id"), "state", state)
+		c.JSON(200, gin.H{"order_id": c.Param("id"), "state": state})
+	}
+}
+func (a *App) charge(c *gin.Context) {
+	var p Payment
+	if !bind(c, &p) {
+		return
+	}
+	if !validID.MatchString(p.OrderID) || p.Amount <= 0 || p.Amount > 10000000 || p.State != "" {
+		c.Status(400)
+		return
+	}
+	p.State = "paid"
+	err := a.query(c.Request.Context(), "payment_record", func(db *gorm.DB) error {
+		return db.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&p).Error; err != nil {
+				return err
+			}
+			var prior Payment
+			if err := tx.First(&prior, "order_id = ?", p.OrderID).Error; err != nil {
+				return err
+			}
+			if prior.Amount != p.Amount {
+				return errConflict
+			}
+			return nil
+		})
+	})
+	if err != nil {
+		a.fail(c, err)
+		return
+	}
+	telemetry.Log(c.Request.Context(), slog.LevelInfo, "payment recorded", "order_id", p.OrderID, "state", "paid")
+	c.JSON(200, p)
+}
+func (a *App) lock(c *gin.Context) bool {
+	select {
+	case a.orderGate <- struct{}{}:
+		return true
+	case <-c.Request.Context().Done():
+		a.fail(c, c.Request.Context().Err())
+		return false
+	}
+}
+func (a *App) createOrder(c *gin.Context) {
+	var req struct {
+		ID       string `json:"id"`
+		SKU      string `json:"sku"`
+		Quantity int64  `json:"quantity"`
+	}
+	if !bind(c, &req) {
+		return
+	}
+	if !validID.MatchString(req.ID) || !validID.MatchString(req.SKU) || req.Quantity < 1 || req.Quantity > 5 {
+		c.Status(400)
+		return
+	}
+	if !a.lock(c) {
+		return
+	}
+	defer func() { <-a.orderGate }()
+	var prior Order
+	err := a.query(c.Request.Context(), "order_lookup", func(db *gorm.DB) error { return db.Limit(1).Find(&prior, "id = ?", req.ID).Error })
+	if err == nil && prior.ID != "" {
+		if prior.SKU != req.SKU || prior.Quantity != req.Quantity {
+			a.fail(c, errConflict)
+			return
+		}
+		c.JSON(200, prior)
+		return
+	}
+	if err != nil {
+		a.fail(c, err)
+		return
+	}
+	var p Product
+	if err := a.call(c, "product-service", "GET", "/products/"+req.SKU, nil, &p); err != nil {
+		a.fail(c, err)
+		return
+	}
+	o := Order{req.ID, req.SKU, req.Quantity, p.Price * req.Quantity, "creating"}
+	if err := a.query(c.Request.Context(), "order_create", func(db *gorm.DB) error { return db.Create(&o).Error }); err != nil {
+		a.fail(c, err)
+		return
+	}
+	err = a.call(c, "inventory-service", "POST", "/reservations", Reservation{OrderID: o.ID, SKU: o.SKU, Quantity: o.Quantity}, nil)
+	if err != nil {
+		_ = a.setOrder(c, &o, "failed")
+		a.fail(c, err)
+		return
+	}
+	if err := a.setOrder(c, &o, "awaiting_payment"); err != nil {
+		_ = a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil)
+		a.fail(c, err)
+		return
+	}
+	c.JSON(201, o)
+}
+func (a *App) setOrder(c *gin.Context, o *Order, state string) error {
+	err := a.query(c.Request.Context(), "order_update", func(db *gorm.DB) error { return db.Model(o).Update("state", state).Error })
+	if err == nil {
+		o.State = state
+		telemetry.Log(c.Request.Context(), slog.LevelInfo, "order state changed", "order_id", o.ID, "state", state)
+	}
+	return err
+}
+func (a *App) loadOrder(c *gin.Context) (Order, error) {
+	var o Order
+	err := a.query(c.Request.Context(), "order_lookup", func(db *gorm.DB) error { return db.First(&o, "id = ?", c.Param("id")).Error })
+	return o, err
+}
+func (a *App) getOrder(c *gin.Context) {
+	o, err := a.loadOrder(c)
+	if err != nil {
+		a.fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}
+func (a *App) payOrder(c *gin.Context) {
+	if !a.lock(c) {
+		return
+	}
+	defer func() { <-a.orderGate }()
+	o, err := a.loadOrder(c)
+	if err != nil {
+		a.fail(c, err)
+		return
+	}
+	if o.State == "paid" {
+		c.JSON(200, o)
+		return
+	}
+	if o.State != "awaiting_payment" && o.State != "payment_unknown" {
+		a.fail(c, errConflict)
+		return
+	}
+	var p Payment
+	err = a.call(c, "payment-service", "POST", "/payments", Payment{OrderID: o.ID, Amount: o.Amount}, &p)
+	if err != nil {
+		var pe *peerError
+		if errors.As(err, &pe) && pe.Status >= 400 && pe.Status < 600 {
+			if releaseErr := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil); releaseErr != nil {
+				_ = a.setOrder(c, &o, "reconciliation_required")
+				a.fail(c, fmt.Errorf("payment failed; inventory release failed: %w", releaseErr))
+				return
+			}
+			_ = a.setOrder(c, &o, "payment_failed")
+		} else {
+			_ = a.setOrder(c, &o, "payment_unknown")
+		}
+		a.fail(c, err)
+		return
+	}
+	if err := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/confirm", nil, nil); err != nil {
+		_ = a.setOrder(c, &o, "reconciliation_required")
+		a.fail(c, err)
+		return
+	}
+	if err := a.setOrder(c, &o, "paid"); err != nil {
+		a.fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}
+func (a *App) cancelOrder(c *gin.Context) {
+	if !a.lock(c) {
+		return
+	}
+	defer func() { <-a.orderGate }()
+	o, err := a.loadOrder(c)
+	if err != nil {
+		a.fail(c, err)
+		return
+	}
+	if o.State == "cancelled" {
+		c.JSON(200, o)
+		return
+	}
+	if o.State != "awaiting_payment" {
+		a.fail(c, errConflict)
+		return
+	}
+	if err := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil); err != nil {
+		a.fail(c, err)
+		return
+	}
+	if err := a.setOrder(c, &o, "cancelled"); err != nil {
+		a.fail(c, err)
+		return
+	}
+	c.JSON(200, o)
+}

@@ -10,6 +10,7 @@ import (
 	"go-otel-demo/service-d/internal/database"
 
 	"github.com/gin-gonic/gin"
+	"go-otel-demo/service-d/internal/exercise"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -33,10 +34,25 @@ func TraceIDHeaderMiddleware() gin.HandlerFunc {
 }
 
 func (h *Handler) Register(router *gin.Engine) {
+	h.registerExercise(router)
 	router.GET("/health", h.Health)
 	router.GET("/mysql/ok", h.MySQLOK)
 	router.GET("/mysql/error", h.MySQLError)
 	router.GET("/mysql/slow", h.MySQLSlow)
+}
+
+func (h *Handler) registerExercise(router *gin.Engine) {
+	exercise.Register(router, h.cfg.Server.Name, nil, func(ctx context.Context, action string) error {
+		if action == "missing_table" {
+			return h.db.QueryBrokenTable(ctx)
+		}
+		if action == "slow_query" {
+			_, err := h.db.SlowListUsers(ctx, 4*time.Second)
+			return err
+		}
+		_, err := h.db.ListUsers(ctx)
+		return err
+	})
 }
 
 func (h *Handler) Health(c *gin.Context) {

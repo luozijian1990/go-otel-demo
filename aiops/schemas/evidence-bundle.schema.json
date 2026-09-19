@@ -1,0 +1,205 @@
+{
+  "$defs": {
+    "IncidentContext": {
+      "additionalProperties": false,
+      "properties": {
+        "time_unit": {
+          "const": "unix_seconds",
+          "default": "unix_seconds",
+          "title": "Time Unit",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "entry_service": {
+          "const": "service-a",
+          "default": "service-a",
+          "title": "Entry Service",
+          "type": "string"
+        },
+        "route": {
+          "const": "/exercise",
+          "default": "/exercise",
+          "title": "Route",
+          "type": "string"
+        },
+        "start_at": {
+          "title": "Start At",
+          "type": "number"
+        },
+        "end_at": {
+          "title": "End At",
+          "type": "number"
+        },
+        "request_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Request Ids",
+          "type": "array"
+        },
+        "trace_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Trace Ids",
+          "type": "array"
+        },
+        "observed_symptoms": {
+          "items": {
+            "type": "object"
+          },
+          "title": "Observed Symptoms",
+          "type": "array"
+        },
+        "windows": {
+          "additionalProperties": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Windows",
+          "type": "object"
+        },
+        "completed_requests": {
+          "default": 0,
+          "title": "Completed Requests",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "start_at",
+        "end_at"
+      ],
+      "title": "IncidentContext",
+      "type": "object"
+    },
+    "SignalState": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "available",
+            "partial",
+            "unavailable",
+            "not_found_after_deadline",
+            "insufficient_samples",
+            "pending"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "attempts": {
+          "default": 0,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "SignalState",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "title": "Run Id",
+      "type": "string"
+    },
+    "incident": {
+      "$ref": "#/$defs/IncidentContext"
+    },
+    "availability": {
+      "additionalProperties": {
+        "$ref": "#/$defs/SignalState"
+      },
+      "title": "Availability",
+      "type": "object"
+    },
+    "traces": {
+      "items": {
+        "type": "object"
+      },
+      "title": "Traces",
+      "type": "array"
+    },
+    "logs": {
+      "items": {
+        "type": "object"
+      },
+      "title": "Logs",
+      "type": "array"
+    },
+    "metrics": {
+      "title": "Metrics",
+      "type": "object"
+    },
+    "evidence_index": {
+      "additionalProperties": {
+        "type": "object"
+      },
+      "title": "Evidence Index",
+      "type": "object"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "collected_at": {
+      "title": "Collected At",
+      "type": "number"
+    },
+    "bundle_hash": {
+      "default": "",
+      "title": "Bundle Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "incident",
+    "availability",
+    "collected_at"
+  ],
+  "title": "EvidenceBundle",
+  "type": "object"
+}

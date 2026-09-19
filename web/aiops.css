@@ -1,0 +1,15 @@
+#aiops-lab { margin-top: 32px; }
+#aiops-lab h3 { font-size: 15px; margin: 24px 0 12px; }
+.lab-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.lab-toolbar select { padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); }
+.lab-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; border-top: 1px solid var(--border); margin-top: 20px; }
+.lab-columns > div { min-width: 0; }
+#lab-random { background: var(--danger); color: var(--bg); border-color: var(--danger); }
+#lab-status { border-left: 3px solid var(--primary); padding-left: 12px; }
+#aiops-lab pre, #lab-diagnosis, #lab-business { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 var(--mono); max-height: 420px; overflow-y: auto; }
+#aiops-lab pre { min-height: 0; height: auto; margin: 12px 0; padding: 12px; }
+#lab-business { font-family: inherit; font-size: 13px; line-height: 1.9; padding: 12px 0; }
+#aiops-lab details { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 14px; }
+#aiops-lab summary { cursor: pointer; color: var(--muted); }
+#lab-result { display: block; width: 100%; background: var(--code-bg); color: var(--code-text); border: 1px solid var(--border); margin: 10px 0; padding: 12px; }
+@media (max-width: 760px) { .lab-columns { grid-template-columns: 1fr; } }

@@ -1,23 +1,41 @@
 services:
+  log-init:
+    image: alpine:3.20
+    user: "0:0"
+    command: ["sh", "-c", "chown 65532:65532 /logs/a /logs/b /logs/c /logs/d && chmod 750 /logs/a /logs/b /logs/c /logs/d && chown 10001:10001 /offsets && chmod 750 /offsets"]
+    volumes:
+      - order-service-logs:/logs/a
+      - payment-service-logs:/logs/b
+      - product-service-logs:/logs/c
+      - inventory-service-logs:/logs/d
+      - collector-offsets:/offsets
   jaeger:
     image: jaegertracing/all-in-one:1.76.0
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
-      - "16686:16686"
-      - "4317"
-      - "4318"
+      - "127.0.0.1:16686:16686"
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.123.0
+    group_add: ["65532"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - order-service-logs:/var/log/order-service:ro
+      - payment-service-logs:/var/log/payment-service:ro
+      - product-service-logs:/var/log/product-service:ro
+      - inventory-service-logs:/var/log/inventory-service:ro
+      - ./logs/traefik:/var/log/traefik:ro
+      - collector-offsets:/var/lib/otelcol
     ports:
-      - "4317:4317"
-      - "4318:4318"
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
     depends_on:
-      - jaeger
+      jaeger:
+        condition: service_started
+      log-init:
+        condition: service_completed_successfully
 
   traefik:
     image: traefik:v3.4
@@ -26,22 +44,22 @@ services:
       - ./traefik/dynamic.yaml:/etc/traefik/dynamic.yaml:ro
       - ./logs/traefik:/logs
     ports:
-      - "18086:80"
-      - "18082:8080"
+      - "127.0.0.1:18086:80"
+      - "127.0.0.1:18082:8080"
     depends_on:
       - otel-collector
-      - service-a
-      - service-b
-      - service-c
-      - service-d
+      - order-service
+      - payment-service
+      - product-service
+      - inventory-service
 
   demo-ui:
     image: nginx:alpine
     volumes:
-      - ./web/index.html:/usr/share/nginx/html/index.html:ro
+      - ./web:/usr/share/nginx/html:ro
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
-      - "18083:80"
+      - "127.0.0.1:18083:80"
     # nginx.conf references upstream `traefik`, so traefik must exist
     # in the docker network before nginx starts (it tries to resolve
     # the upstream at boot, not lazily). traefik does NOT need demo-ui
@@ -56,74 +74,222 @@ services:
   # for the rollout rationale; see docs/observations/2026-05-18-otel-auto-findings.md
   # for the experimental validation.
 
-  service-a:
-    build: ./service-a
-    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+  order-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: service-a
     stop_grace_period: 15s
     volumes:
-      - ./service-a/config.yaml:/etc/go-otel-demo/config.yaml:ro
+      - order-service-logs:/var/log/demo
     environment:
-      - OTEL_SERVICE_NAME=service-a
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_EXPORTER_OTLP_INSECURE=true
-      - OTEL_TRACES_SAMPLER=parentbased_always_on
-      - OTEL_PROPAGATORS=tracecontext,baggage
-    ports:
-      - "18080:8080"
+      DEMO_LOG_FILE: /var/log/demo/app.log
+      DEMO_FAULTS_ENABLED: "true"
+      DEMO_FAULT_SECRET: ${DEMO_FAULT_SECRET:?Run scripts/init-demo-env.sh first}
+      BUSINESS_MYSQL_DSN: "${BUSINESS_MYSQL_DSN:-demo:demo-local-only@tcp(mysql:3306)/otel_demo?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=5s}"
+      BUSINESS_REDIS_ADDR: ${BUSINESS_REDIS_ADDR:-redis:6379}
+      BUSINESS_REDIS_PASSWORD: ${BUSINESS_REDIS_PASSWORD:-}
+      OTEL_SERVICE_NAME: order-service
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE: ""
+    ports: ["127.0.0.1:18080:8080"]
+    healthcheck:
+      test: ["CMD", "/app/server", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     depends_on:
-      - otel-collector
+      log-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      product-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
 
-  service-b:
-    build: ./service-b
-    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+  payment-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: service-b
     stop_grace_period: 15s
     volumes:
-      - ./service-b/config.yaml:/etc/go-otel-demo/config.yaml:ro
+      - payment-service-logs:/var/log/demo
     environment:
-      - OTEL_SERVICE_NAME=service-b
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_EXPORTER_OTLP_INSECURE=true
-      - OTEL_TRACES_SAMPLER=parentbased_always_on
-      - OTEL_PROPAGATORS=tracecontext,baggage
-    ports:
-      - "18081:8080"
+      DEMO_LOG_FILE: /var/log/demo/app.log
+      DEMO_FAULTS_ENABLED: "true"
+      DEMO_FAULT_SECRET: ${DEMO_FAULT_SECRET:?Run scripts/init-demo-env.sh first}
+      BUSINESS_MYSQL_DSN: "${BUSINESS_MYSQL_DSN:-demo:demo-local-only@tcp(mysql:3306)/otel_demo?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=5s}"
+      BUSINESS_REDIS_ADDR: ${BUSINESS_REDIS_ADDR:-redis:6379}
+      BUSINESS_REDIS_PASSWORD: ${BUSINESS_REDIS_PASSWORD:-}
+      OTEL_SERVICE_NAME: payment-service
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE: ""
+    ports: ["127.0.0.1:18081:8080"]
+    healthcheck:
+      test: ["CMD", "/app/server", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     depends_on:
-      - otel-collector
+      log-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      mysql:
+        condition: service_healthy
 
-  service-c:
-    build: ./service-c
-    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+  product-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: service-c
     stop_grace_period: 15s
     volumes:
-      - ./service-c/config.yaml:/etc/go-otel-demo/config.yaml:ro
+      - product-service-logs:/var/log/demo
     environment:
-      - OTEL_SERVICE_NAME=service-c
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_EXPORTER_OTLP_INSECURE=true
-      - OTEL_TRACES_SAMPLER=parentbased_always_on
-      - OTEL_PROPAGATORS=tracecontext,baggage
-    ports:
-      - "18084:8080"
+      DEMO_LOG_FILE: /var/log/demo/app.log
+      DEMO_FAULTS_ENABLED: "true"
+      DEMO_FAULT_SECRET: ${DEMO_FAULT_SECRET:?Run scripts/init-demo-env.sh first}
+      BUSINESS_MYSQL_DSN: "${BUSINESS_MYSQL_DSN:-demo:demo-local-only@tcp(mysql:3306)/otel_demo?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=5s}"
+      BUSINESS_REDIS_ADDR: ${BUSINESS_REDIS_ADDR:-redis:6379}
+      BUSINESS_REDIS_PASSWORD: ${BUSINESS_REDIS_PASSWORD:-}
+      OTEL_SERVICE_NAME: product-service
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE: ""
+    ports: ["127.0.0.1:18084:8080"]
+    healthcheck:
+      test: ["CMD", "/app/server", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     depends_on:
-      - otel-collector
+      log-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  service-d:
-    build: ./service-d
-    command: ["-config", "/etc/go-otel-demo/config.yaml"]
+  inventory-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE_DIR: service-d
     stop_grace_period: 15s
     volumes:
-      - ./service-d/config.yaml:/etc/go-otel-demo/config.yaml:ro
+      - inventory-service-logs:/var/log/demo
     environment:
-      - OTEL_SERVICE_NAME=service-d
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_EXPORTER_OTLP_INSECURE=true
-      - OTEL_TRACES_SAMPLER=parentbased_always_on
-      - OTEL_PROPAGATORS=tracecontext,baggage
-    ports:
-      - "18085:8080"
+      DEMO_LOG_FILE: /var/log/demo/app.log
+      DEMO_FAULTS_ENABLED: "true"
+      DEMO_FAULT_SECRET: ${DEMO_FAULT_SECRET:?Run scripts/init-demo-env.sh first}
+      BUSINESS_MYSQL_DSN: "${BUSINESS_MYSQL_DSN:-demo:demo-local-only@tcp(mysql:3306)/otel_demo?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=5s}"
+      BUSINESS_REDIS_ADDR: ${BUSINESS_REDIS_ADDR:-redis:6379}
+      BUSINESS_REDIS_PASSWORD: ${BUSINESS_REDIS_PASSWORD:-}
+      OTEL_SERVICE_NAME: inventory-service
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+      OTEL_TRACES_SAMPLER: parentbased_always_on
+      OTEL_PROPAGATORS: tracecontext,baggage
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST: ""
+      OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE: ""
+    ports: ["127.0.0.1:18085:8080"]
+    healthcheck:
+      test: ["CMD", "/app/server", "healthcheck"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     depends_on:
-      - otel-collector
+      log-init:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+
+  mysql:
+    image: mysql:8.4.4
+    environment:
+      MYSQL_DATABASE: otel_demo
+      MYSQL_USER: demo
+      MYSQL_PASSWORD: demo-local-only
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7.4.2-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  loki:
+    image: grafana/loki:3.4.2
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./observability/loki/config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports: ["127.0.0.1:13100:3100"]
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=512MB"]
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports: ["127.0.0.1:19090:9090"]
+volumes:
+  mysql-data:
+  loki-data:
+  prometheus-data:
+  collector-offsets:
+  order-service-logs:
+  payment-service-logs:
+  product-service-logs:
+  inventory-service-logs:

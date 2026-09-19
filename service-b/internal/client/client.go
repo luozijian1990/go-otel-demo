@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"go-otel-demo/service-b/internal/telemetry"
 	"io"
 	"net/http"
 	"net/url"
@@ -39,7 +40,7 @@ func NewPeerClient(cfg config.Config) (*PeerClient, error) {
 		serviceCURL: strings.TrimRight(cfg.Peer.ServiceCURL, "/"),
 		serviceDURL: strings.TrimRight(cfg.Peer.ServiceDURL, "/"),
 		client: &http.Client{
-			Timeout:   10 * time.Second,
+			Timeout: 10 * time.Second,
 			// Transport intentionally omitted: under loongsuite-go-agent the
 			// agent auto-instruments net/http RoundTrip and is expected to
 			// inject traceparent into outbound requests.
@@ -63,6 +64,7 @@ func (c *PeerClient) CallPeer(ctx context.Context, path string, depth int) (int,
 	if err != nil {
 		return 0, "", fmt.Errorf("create peer request: %w", err)
 	}
+	telemetry.Propagate(ctx, req.Header)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return 0, "", fmt.Errorf("call peer %s: %w", path, err)
@@ -109,6 +111,7 @@ func (c *PeerClient) call(ctx context.Context, baseURL, path string) (int, strin
 	if err != nil {
 		return 0, "", fmt.Errorf("create downstream request: %w", err)
 	}
+	telemetry.Propagate(ctx, req.Header)
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return 0, "", fmt.Errorf("call downstream %s: %w", path, err)
