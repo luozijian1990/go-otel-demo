@@ -101,7 +101,7 @@ processors:
         status_code:
           status_codes:
             - ERROR
-      # 慢请求 100% 保留。这里阈值是 3000ms，对应 Demo 里的 /slow sleep 5 秒。
+      # 慢请求采样阈值为 3000ms，覆盖业务演示中的应用等待和慢 SQL。
       - name: keep-slow-requests
         type: latency
         latency:

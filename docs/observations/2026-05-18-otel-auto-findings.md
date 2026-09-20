@@ -1,5 +1,7 @@
 # Observations: OTel Auto Instrumentation Experiment (loongsuite-go-agent)
 
+> 历史验证记录：以下内容保留当时的环境与结果；其中提及的旧源码、配置、脚本或临时路径可能已移除。当前运行方式以根 README 为准。
+
 > **Date**: 2026-05-18 / 2026-05-19
 > **Branch**: `otel-auto`
 > **Related plan**: `docs/plans/2026-05-18-add-otel-auto-instrumentation-{proposal,design,tasks}.md`

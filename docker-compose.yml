@@ -68,11 +68,8 @@ services:
     depends_on:
       - traefik
 
-  # All 4 Go services build with loongsuite-go-agent (otel go build) and rely
-  # on the OTEL_* env vars below for SDK bootstrap (mode B — no observability.Init
-  # in application code). See docs/plans/2026-05-19-roll-out-otel-auto-tasks.md
-  # for the rollout rationale; see docs/observations/2026-05-18-otel-auto-findings.md
-  # for the experimental validation.
+  # Four business services share commerce/ and build with LoongSuite (otel go build).
+  # OTEL_* configures the agent-owned tracing SDK; application code reuses its provider.
 
   order-service:
     build:
