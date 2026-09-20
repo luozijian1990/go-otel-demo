@@ -1,9 +1,9 @@
 package commerce
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"go-otel-demo/commerce/telemetry"
@@ -76,11 +76,16 @@ func (a *App) product(c *gin.Context) {
 			return
 		}
 	}
-	if err != nil && !errors.Is(err, redis.Nil) {
+	fallback := err != nil && !errors.Is(err, redis.Nil)
+	if fallback {
 		telemetry.Fallback(ctx)
 	}
 	var p Product
-	if err := a.query(ctx, "product_lookup", func(db *gorm.DB) error { return db.First(&p, "sku = ?", sku).Error }); err != nil {
+	lookupErr := a.query(ctx, "product_lookup", func(db *gorm.DB) error { return db.First(&p, "sku = ?", sku).Error })
+	if fallback {
+		telemetry.FallbackResult(ctx, lookupErr)
+	}
+	if err := lookupErr; err != nil {
 		a.fail(c, err)
 		return
 	}
@@ -113,12 +118,12 @@ func (a *App) reserveHandler(c *gin.Context) {
 		c.Status(400)
 		return
 	}
-	if err := a.reserve(c.Request.Context(), r); err != nil {
+	result, err := a.reserve(c.Request.Context(), r)
+	if err != nil {
 		a.fail(c, err)
 		return
 	}
-	r.State = "held"
-	c.JSON(200, r)
+	c.JSON(200, result)
 }
 func (a *App) reservationHandler(state string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -194,47 +199,125 @@ func (a *App) createOrder(c *gin.Context) {
 	defer func() { <-a.orderGate }()
 	var prior Order
 	err := a.query(c.Request.Context(), "order_lookup", func(db *gorm.DB) error { return db.Limit(1).Find(&prior, "id = ?", req.ID).Error })
-	if err == nil && prior.ID != "" {
+	if err != nil {
+		a.fail(c, err)
+		return
+	}
+	recovering := prior.ID != ""
+	o := prior
+	if recovering {
 		if prior.SKU != req.SKU || prior.Quantity != req.Quantity {
 			a.fail(c, errConflict)
 			return
 		}
-		c.JSON(200, prior)
-		return
+		if prior.State != "creating" && prior.State != "reservation_unknown" {
+			c.JSON(200, prior)
+			return
+		}
+	} else {
+		var p Product
+		if err := a.call(c, "product-service", "GET", "/products/"+req.SKU, nil, &p); err != nil {
+			a.fail(c, err)
+			return
+		}
+		o = Order{req.ID, req.SKU, req.Quantity, p.Price * req.Quantity, "creating"}
+		if err := a.query(c.Request.Context(), "order_create", func(db *gorm.DB) error { return db.Create(&o).Error }); err != nil {
+			a.fail(c, err)
+			return
+		}
 	}
+	var reservation Reservation
+	err = a.call(c, "inventory-service", "POST", "/reservations", Reservation{OrderID: o.ID, SKU: o.SKU, Quantity: o.Quantity}, &reservation)
 	if err != nil {
-		a.fail(c, err)
+		state := "reservation_unknown"
+		if recovering && reconciliationConflict(err) {
+			state = "reconciliation_required"
+		}
+		if !recovering && definitelyNotApplied(err) {
+			state = "failed"
+		}
+		a.finishError(c, &o, state, err, nil)
 		return
 	}
-	var p Product
-	if err := a.call(c, "product-service", "GET", "/products/"+req.SKU, nil, &p); err != nil {
-		a.fail(c, err)
+	if reservation.State != "held" {
+		a.finishError(c, &o, "reconciliation_required", errConflict, nil)
 		return
 	}
-	o := Order{req.ID, req.SKU, req.Quantity, p.Price * req.Quantity, "creating"}
-	if err := a.query(c.Request.Context(), "order_create", func(db *gorm.DB) error { return db.Create(&o).Error }); err != nil {
-		a.fail(c, err)
-		return
-	}
-	err = a.call(c, "inventory-service", "POST", "/reservations", Reservation{OrderID: o.ID, SKU: o.SKU, Quantity: o.Quantity}, nil)
-	if err != nil {
-		_ = a.setOrder(c, &o, "failed")
-		a.fail(c, err)
-		return
-	}
+	// Keep creating/unknown as a retry entry if the final state write fails. No
+	// release is attempted here: its lost response could leave a payable order.
 	if err := a.setOrder(c, &o, "awaiting_payment"); err != nil {
-		_ = a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil)
-		a.fail(c, err)
+		a.finishError(c, &o, "reservation_unknown", err, nil)
 		return
 	}
-	c.JSON(201, o)
+	status := 201
+	if recovering {
+		status = 200
+	}
+	c.JSON(status, o)
 }
+
+// A hard-bounded final state write preserves correlation after request cancellation.
+// Responses report only the last acknowledged persistent state.
+func (a *App) finishError(c *gin.Context, o *Order, state string, primary, compensation error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(c.Request.Context()), 2*time.Second)
+	defer cancel()
+	cleanup := c.Copy()
+	cleanup.Request = c.Request.Clone(ctx)
+	persistErr := a.setOrder(cleanup, o, state)
+	compensationOutcome := "not_attempted"
+	if compensation != nil {
+		compensationOutcome = classify(compensation, "release").Outcome
+	}
+	if c.GetBool("compensation_applied") {
+		compensationOutcome = "applied"
+	}
+	needsRecovery := persistErr != nil || state == "payment_unknown" || state == "reservation_unknown" || state == "cancel_pending" || state == "reconciliation_required"
+	attrs := []any{"order_id", o.ID, "state", o.State, "requested_state", state, "state_persisted", persistErr == nil, "reconciliation_required", needsRecovery, "primary_error", primary.Error(), "operation_outcome", classify(primary, operation(c.Request.URL.Path)).Outcome, "compensation_outcome", compensationOutcome}
+	if compensation != nil {
+		attrs = append(attrs, "compensation_error", compensation.Error())
+	}
+	if persistErr != nil {
+		attrs = append(attrs, "state_error", persistErr.Error())
+	}
+	level := slog.LevelError
+	if classify(primary, operation(c.Request.URL.Path)).BusinessRejected() && compensation == nil && persistErr == nil {
+		level = slog.LevelWarn
+	}
+	telemetry.Log(ctx, level, "order operation outcome", attrs...)
+	c.Set("order_state", o.State)
+	c.Set("state_persisted", persistErr == nil)
+	err := primary
+	if compensation != nil || persistErr != nil {
+		err = &OperationError{Code: "internal_failure", Category: "internal_failure", Operation: operation(c.Request.URL.Path), Outcome: "unknown", Cause: errors.Join(primary, compensation, persistErr)}
+	}
+	a.fail(c, err)
+}
+
 func (a *App) setOrder(c *gin.Context, o *Order, state string) error {
-	err := a.query(c.Request.Context(), "order_update", func(db *gorm.DB) error { return db.Model(o).Update("state", state).Error })
+	err := a.query(c.Request.Context(), "order_update", func(db *gorm.DB) error {
+		result := db.Model(&Order{}).Where("id = ?", o.ID).Update("state", state)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			var persisted Order
+			if err := db.First(&persisted, "id = ?", o.ID).Error; err != nil {
+				return err
+			}
+			if persisted.State != state {
+				return errConflict
+			}
+		}
+		return nil
+	})
 	if err == nil {
 		o.State = state
 		telemetry.Log(c.Request.Context(), slog.LevelInfo, "order state changed", "order_id", o.ID, "state", state)
+	} else {
+		telemetry.Log(c.Request.Context(), slog.LevelError, "order state persistence failed", "order_id", o.ID, "state", o.State, "requested_state", state, "state_persisted", false, "error_message", err.Error())
 	}
+	c.Set("order_state", o.State)
+	c.Set("state_persisted", err == nil)
 	return err
 }
 func (a *App) loadOrder(c *gin.Context) (Order, error) {
@@ -268,30 +351,42 @@ func (a *App) payOrder(c *gin.Context) {
 		a.fail(c, errConflict)
 		return
 	}
+	recovering := o.State == "payment_unknown"
+	if err := a.setOrder(c, &o, "payment_unknown"); err != nil {
+		a.fail(c, err)
+		return
+	}
 	var p Payment
 	err = a.call(c, "payment-service", "POST", "/payments", Payment{OrderID: o.ID, Amount: o.Amount}, &p)
 	if err != nil {
-		var pe *peerError
-		if errors.As(err, &pe) && pe.Status >= 400 && pe.Status < 600 {
-			if releaseErr := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil); releaseErr != nil {
-				_ = a.setOrder(c, &o, "reconciliation_required")
-				a.fail(c, fmt.Errorf("payment failed; inventory release failed: %w", releaseErr))
+		if !recovering && definitelyNotApplied(err) {
+			// Persist the compensation intent before release, so a crash cannot resume payment.
+			if stateErr := a.setOrder(c, &o, "reconciliation_required"); stateErr != nil {
+				a.finishError(c, &o, "reconciliation_required", err, stateErr)
 				return
 			}
-			_ = a.setOrder(c, &o, "payment_failed")
-		} else {
-			_ = a.setOrder(c, &o, "payment_unknown")
+			if releaseErr := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil); releaseErr != nil {
+				a.finishError(c, &o, "reconciliation_required", err, releaseErr)
+				return
+			}
+			c.Set("compensation_applied", true)
+			telemetry.Log(c.Request.Context(), slog.LevelInfo, "payment compensation completed", "order_id", o.ID, "compensation_outcome", "applied")
+			a.finishError(c, &o, "payment_failed", err, nil)
+			return
 		}
-		a.fail(c, err)
+		state := "payment_unknown"
+		if reconciliationConflict(err) {
+			state = "reconciliation_required"
+		}
+		a.finishError(c, &o, state, err, nil)
 		return
 	}
 	if err := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/confirm", nil, nil); err != nil {
-		_ = a.setOrder(c, &o, "reconciliation_required")
-		a.fail(c, err)
+		a.finishError(c, &o, "reconciliation_required", err, nil)
 		return
 	}
 	if err := a.setOrder(c, &o, "paid"); err != nil {
-		a.fail(c, err)
+		a.finishError(c, &o, "payment_unknown", err, nil)
 		return
 	}
 	c.JSON(200, o)
@@ -310,16 +405,20 @@ func (a *App) cancelOrder(c *gin.Context) {
 		c.JSON(200, o)
 		return
 	}
-	if o.State != "awaiting_payment" {
+	if o.State != "awaiting_payment" && o.State != "cancel_pending" {
 		a.fail(c, errConflict)
 		return
 	}
-	if err := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil); err != nil {
+	if err := a.setOrder(c, &o, "cancel_pending"); err != nil {
 		a.fail(c, err)
 		return
 	}
+	if err := a.call(c, "inventory-service", "POST", "/reservations/"+o.ID+"/release", nil, nil); err != nil {
+		a.finishError(c, &o, "cancel_pending", err, nil)
+		return
+	}
 	if err := a.setOrder(c, &o, "cancelled"); err != nil {
-		a.fail(c, err)
+		a.finishError(c, &o, "cancel_pending", err, nil)
 		return
 	}
 	c.JSON(200, o)

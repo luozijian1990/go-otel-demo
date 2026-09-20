@@ -45,3 +45,22 @@ class QueryTest(unittest.TestCase):
         self.assertFalse(any('aiops' in x or 'commerce' in x for x in imports))
 
 if __name__=='__main__':unittest.main()
+
+class GatewayTest(unittest.TestCase):
+    def test_default_logs_include_gateway_and_keep_and_filters(self):
+        a=Namespace(service=None,trace_id='a'*32,request_id='req',run_id='run',limit=100,url=None)
+        with patch.object(q,'read_json',return_value={}) as read:
+            result=q.logs(a,1,2)
+        expression=read.call_args.args[2]['query']
+        self.assertIn('traefik',expression)
+        self.assertIn(' | request_id=',expression)
+        self.assertIn(' | experiment_id=',expression)
+        self.assertTrue(any('Traefik' in x and 'AND' in x for x in result['limitations']))
+    def test_gateway_metrics_rejected_before_network(self):
+        with patch.object(q,'read_json') as read:
+            with self.assertRaisesRegex(ValueError,'business metric'):q.metrics(Namespace(service='traefik',url=None),1,61)
+            read.assert_not_called()
+    def test_unknown_service_rejected(self):
+        for source in ('logs','traces','metrics'):
+            with self.assertRaises(ValueError):q.validate_service(source,'unknown')
+        for source in ('logs','traces'):q.validate_service(source,'traefik')

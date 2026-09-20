@@ -1,0 +1,12 @@
+[
+ {"id":"F01","business":"product","target":"product-service","action":"cache_refused","status":200},
+ {"id":"F02","business":"product","target":"product-service","action":"slow_sql","status":200},
+ {"id":"F03","business":"inventory","target":"inventory-service","action":"missing_table","status":500},
+ {"id":"F04","business":"inventory","target":"inventory-service","action":"slow_sql","status":200},
+ {"id":"F05","business":"order","target":"order-service","action":"missing_table","status":500},
+ {"id":"F06","business":"order","target":"inventory-service","action":"missing_table","status":500},
+ {"id":"F07","business":"order","target":"product-service","action":"slow_sql","status":201},
+ {"id":"F08","business":"payment","target":"payment-service","action":"missing_table","status":500},
+ {"id":"F09","business":"payment","target":"payment-service","action":"slow_sql","status":200},
+ {"id":"F10","business":"payment","target":"order-service","action":"application_delay","status":200}
+]

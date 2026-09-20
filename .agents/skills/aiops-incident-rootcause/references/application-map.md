@@ -36,7 +36,7 @@ SKU 示例为 SKU-001，金额单位为分。库存以事务锁保护，重复�
 - 演示流量由嵌入订单进程的 driver 发出；每次以独立 trace 的 business.request client span 开始，带 demo.traffic_driver=true，后续进入真实 Traefik 和业务服务。该 driver span 不是订单业务故障证据，也不是创建演示的控制请求。
 - Loki 索引：service_name；trace_id、span_id、request_id、experiment_id、order_id 是 metadata。experiment_id 是一次本地演示的随机 ID，不表示故障类别。
 - Prometheus 标签：service_name、http_route、method、status_class、dependency、operation、outcome；没有单请求或订单 ID。
-- HTTP 与真实 SQL/Redis 耗时分开记录。fallback counter 表示实际发生的商品缓存回源。
+- HTTP 与真实 SQL/Redis 耗时分开记录。fallback attempt counter 表示 Redis 技术故障后的降级尝试。
 - 入口业务超时约 10 秒；服务间 HTTP 客户端上限 12 秒，并受入站 context 限制。超时后查询是否有迟到/缺失 span，不把最长父 span 直接判为根因。
 - Collector 尾部采样：错误与超过 3 秒请求优先保留，普通成功约 1%；导出和持久化仍可能失败。
 - 只采集业务应用日志与网关业务路径，不把控制接口、真实答案或 AI 报告采进证据。
@@ -45,3 +45,11 @@ SKU 示例为 SKU-001，金额单位为分。库存以事务锁保护，重复�
 ## 本地查询端点
 
 Jaeger http://localhost:16686；Loki http://localhost:13100；Prometheus http://localhost:19090。容器内部使用 jaeger:16686、loki:3100、prometheus:9090。这些是观测读取地址，不是 CMDB 实时探活结果。
+
+## Recovery and gateway contract (2026-09-20)
+
+- creating / reservation_unknown can be retried with identical order ID, SKU and quantity, using the persisted amount. Reservation retries return persisted held/confirmed; confirmed must not regress to awaiting_payment.
+- payment_unknown is persisted before payment. Only a first attempt proven not_applied with no historical uncertainty can release inventory. Unknown followed by not_applied/conflict keeps inventory. Confirm failure after payment requires reconciliation_required.
+- Cancellation persists cancel_pending before release and supports explicit retry. paid/payment_unknown/reconciliation_required reject cancellation. state_persisted=false never claims the requested new state was saved.
+- Jaeger/Loki support service=traefik; business Prometheus templates cover four services only. Gateway may lack request_id/experiment_id; filters remain AND. Query gateway separately using a business TraceId. Time correlation alone is not an exact join.
+- demo_fallback_total counts Redis technical-failure fallback attempts; demo_fallback_results_total distinguishes success/failure. Normal cache misses are excluded. Success means an alternative result was obtained and entered the response path, not client acknowledgement.

@@ -77,11 +77,16 @@ func (a *App) migrate() error {
 func (a *App) query(ctx context.Context, op string, fn func(*gorm.DB) error) error {
 	start := time.Now()
 	err := fn(a.db.WithContext(ctx))
-	telemetry.Observe(ctx, "mysql", op, start, err)
+	var observed error
+	if err != nil {
+		observed = classify(err, op)
+	}
+	telemetry.Observe(ctx, "mysql", op, start, observed)
 	return err
 }
-func (a *App) reserve(ctx context.Context, r Reservation) error {
-	return a.query(ctx, "reserve", func(db *gorm.DB) error {
+func (a *App) reserve(ctx context.Context, r Reservation) (Reservation, error) {
+	var result Reservation
+	err := a.query(ctx, "reserve", func(db *gorm.DB) error {
 		return db.Transaction(func(tx *gorm.DB) error {
 			var stock Stock
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&stock, "sku = ?", r.SKU).Error; err != nil {
@@ -93,9 +98,10 @@ func (a *App) reserve(ctx context.Context, r Reservation) error {
 				return lookup.Error
 			}
 			if lookup.RowsAffected == 1 {
-				if prior.SKU != r.SKU || prior.Quantity != r.Quantity || prior.State == "released" {
+				if prior.SKU != r.SKU || prior.Quantity != r.Quantity || (prior.State != "held" && prior.State != "confirmed") {
 					return errConflict
 				}
+				result = prior
 				return nil
 			}
 			if stock.Available < r.Quantity {
@@ -105,9 +111,17 @@ func (a *App) reserve(ctx context.Context, r Reservation) error {
 				return err
 			}
 			r.State = "held"
-			return tx.Create(&r).Error
+			if err := tx.Create(&r).Error; err != nil {
+				return err
+			}
+			result = r
+			return nil
 		})
 	})
+	if err != nil {
+		return Reservation{}, err
+	}
+	return result, nil
 }
 func (a *App) transition(ctx context.Context, id, state string) error {
 	return a.query(ctx, "reservation_update", func(db *gorm.DB) error {

@@ -1,14 +1,20 @@
 package telemetry
 
 import (
+	"context"
+	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"gopkg.in/natefinch/lumberjack.v2"
+	"log/slog"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRecoveryCountsOnceAndLabelsAreBounded(t *testing.T) {
@@ -80,5 +86,55 @@ func TestRotationKeepsReadablePermissions(t *testing.T) {
 		if info.Mode().Perm() != 0640 {
 			t.Fatalf("collector group cannot read mode %v", info.Mode())
 		}
+	}
+}
+
+func TestFallbackDoesNotDeclareSuccessBeforeResult(t *testing.T) {
+	var output strings.Builder
+	old := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&output, nil)))
+	defer slog.SetDefault(old)
+	Fallback(context.Background())
+	if strings.Contains(output.String(), "served") || strings.Contains(output.String(), "succeeded") {
+		t.Fatal(output.String())
+	}
+	if !strings.Contains(output.String(), "fallback_attempted") {
+		t.Fatal(output.String())
+	}
+}
+
+type rejection struct{}
+
+func (rejection) Error() string          { return "insufficient stock" }
+func (rejection) BusinessRejected() bool { return true }
+func counterValue(c prometheus.Counter) float64 {
+	var m dto.Metric
+	c.Write(&m)
+	return m.Counter.GetValue()
+}
+func TestRejectedDependencyAndFallbackCounters(t *testing.T) {
+	ctx := context.Background()
+	service := Service
+	rejected := calls.WithLabelValues(service, "mysql", "reserve", "rejected")
+	technical := calls.WithLabelValues(service, "mysql", "reserve", "error")
+	beforeRejected, beforeError := counterValue(rejected), counterValue(technical)
+	Observe(ctx, "mysql", "reserve", time.Now(), fmt.Errorf("wrapped: %w", rejection{}))
+	if counterValue(rejected) != beforeRejected+1 || counterValue(technical) != beforeError {
+		t.Fatal("business rejection counted as SQL failure")
+	}
+	Observe(ctx, "mysql", "reserve", time.Now(), errors.New("Error 1146 table unavailable"))
+	if counterValue(technical) != beforeError+1 {
+		t.Fatal("native SQL failure erased")
+	}
+	attempt := fallbacks.WithLabelValues(service, "redis", "unavailable")
+	success := fallbackResults.WithLabelValues(service, "redis", "unavailable", "success")
+	failure := fallbackResults.WithLabelValues(service, "redis", "unavailable", "failure")
+	ba, bs, bf := counterValue(attempt), counterValue(success), counterValue(failure)
+	Fallback(ctx)
+	FallbackResult(ctx, errors.New("SQL unavailable"))
+	Fallback(ctx)
+	FallbackResult(ctx, nil)
+	if counterValue(attempt) != ba+2 || counterValue(success) != bs+1 || counterValue(failure) != bf+1 {
+		t.Fatal("fallback counter semantics")
 	}
 }

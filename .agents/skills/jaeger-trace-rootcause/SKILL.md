@@ -24,3 +24,5 @@ Return concise findings with evidence IDs, TraceId/span IDs, queries/windows, li
 The original standard-library command remains compatible:
 `python3 scripts/analyze-jaeger-trace.py --trace-id TRACE_ID`.
 Both old entrypoints share scripts/observability/trace_cleaner.py; no duplicate cleaner needs synchronization.
+
+Gateway service/time search is supported: `--service traefik --lookback 300`. A business 409 can preserve an HTTP CLIENT error span while the SERVER operation is a business rejection; do not erase genuine Agent errors or treat every 4xx as a technical outage. operation/upstream_service identify the reported operation and direct peer, not necessarily the deepest root cause.

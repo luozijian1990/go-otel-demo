@@ -1,0 +1,19 @@
+{
+  "browser": "153.0.8010.48",
+  "results": [
+    {
+      "url": "http://localhost:18086/ui/",
+      "run_id": "4acbef2ea51e4b5d72536640d2f3ba3f",
+      "selected_after_switch": "41623abf38d3ca9d95660f2c5151abe0",
+      "copy_download": "pass",
+      "page_errors": []
+    },
+    {
+      "url": "http://localhost:18083/",
+      "run_id": "dcdf9bd6caff8d065fb90992a72a0de0",
+      "selected_after_switch": "215099f48a1503641575cec5d095dd5e",
+      "copy_download": "pass",
+      "page_errors": []
+    }
+  ]
+}

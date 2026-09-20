@@ -1,0 +1,51 @@
+ok  	go-otel-demo/commerce	1.943s
+ok  	go-otel-demo/commerce/telemetry	(cached)
+?   	go-otel-demo/service-a/cmd	[no test files]
+?   	go-otel-demo/service-b/cmd	[no test files]
+?   	go-otel-demo/service-c/cmd	[no test files]
+?   	go-otel-demo/service-d/cmd	[no test files]
+..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.386s
+
+OK
+TAP version 13
+# Subtest: A response cannot overwrite selected B; copy/download use B
+ok 1 - A response cannot overwrite selected B; copy/download use B
+  ---
+  duration_ms: 19.483542
+  type: 'test'
+  ...
+# Subtest: stale answer and failed read cannot change B
+ok 2 - stale answer and failed read cannot change B
+  ---
+  duration_ms: 1.986125
+  type: 'test'
+  ...
+# Subtest: new refresh wins same-run poll, stale rejection creates no timer
+ok 3 - new refresh wins same-run poll, stale rejection creates no timer
+  ---
+  duration_ms: 2.68175
+  type: 'test'
+  ...
+# Subtest: only one timer survives refresh and terminal stop ends polling
+ok 4 - only one timer survives refresh and terminal stop ends polling
+  ---
+  duration_ms: 2.533458
+  type: 'test'
+  ...
+# Subtest: late aborted read error cannot replace current status
+ok 5 - late aborted read error cannot replace current status
+  ---
+  duration_ms: 0.880667
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 211.793709

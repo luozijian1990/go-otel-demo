@@ -155,7 +155,7 @@ python3 .agents/skills/loki-incident-logs/scripts/query.py --trace-id TRACE_ID -
 python3 .agents/skills/prometheus-incident-metrics/scripts/query.py --service order-service --lookback 300
 ```
 
-默认回看 5 分钟，可用 `--start` / `--end` 指定现场的 UTC 时间，单次窗口最多 1 小时。查询返回来源、窗口、证据 ID、状态与限制，并脱敏控制字段。无 TraceId 时可用 Jaeger 的 `--service` 查询；Loki 还支持 `--request-id` 和 `--run-id`。这些 Skill 脚本依赖仓库内的 `scripts/observability/`，不要只复制单个 `SKILL.md`。
+默认回看 5 分钟，可用 `--start` / `--end` 指定现场的 UTC 时间，单次窗口最多 1 小时。Jaeger/Loki 支持 `--service traefik`，默认日志包含网关；业务 metrics 明确拒绝 Traefik。网关可能缺少 request/run ID，多条件仍是 AND，建议用代表 TraceId 单独查网关。查询返回来源、窗口、证据 ID、状态与限制，并脱敏控制字段。无 TraceId 时可用 Jaeger 的 `--service` 查询；Loki 还支持 `--request-id` 和 `--run-id`。这些 Skill 脚本依赖仓库内的 `scripts/observability/`，不要只复制单个 `SKILL.md`。
 
 ## 开发与验证
 
@@ -177,6 +177,47 @@ docs/observations/         已保存的验证记录与诊断示例
 ```
 
 四个入口模块通过 `replace` 引用共享 `commerce/`。启动配置来自环境变量；旧 `service-*/config.yaml` 不会被当前入口读取。需要切换到其他演示依赖时，在私有 `.env` 中设置 `BUSINESS_MYSQL_DSN`、`BUSINESS_REDIS_ADDR`、`BUSINESS_REDIS_PASSWORD`，格式见 [.env.example](.env.example)。
+
+### 修复契约与确定性回归
+
+业务错误保留字符串 `error`，新增 `code/category/operation/operation_outcome/upstream_service` 和关联 ID。库存不足/状态冲突跨服务仍为 409；无可信契约的 500/504、坏 JSON、读响应失败均不能证明写操作未应用。`not_applied` 只描述本次尝试。原生 SQL/Redis 原因保留在日志和 Agent trace，公共错误响应不回显下游原文。
+
+同参数重试 `POST /orders` 可恢复 `creating/reservation_unknown`，使用已存金额；重试 `POST /orders/:id/pay` 可恢复 `payment_unknown`。取消先落库 `cancel_pending`，重试取消可恢复；未知支付或待核对状态不能取消。状态落库失败保留最后确认状态并记录 `state_persisted=false`，不会承诺已经修复。预占重试返回真实 held/confirmed；不回退已确认库存。
+
+`demo_fallback_total` 是 Redis 故障后的降级尝试数，`demo_fallback_results_total{outcome="success|failure"}` 是终态数。正常缓存 miss 不计入；成功仅表示取得回源结果并进入响应路径。业务拒绝的依赖标签为 `outcome="rejected"`，技术失败仍为 `error`。
+
+```bash
+# 单元、静态和可控 DOM 回归，不连接数据库
+bash scripts/test-commerce.sh unit
+
+# 生成包含当前未提交源码的隔离副本；输出唯一目录
+python3 scripts/prepare-isolated-commerce.py
+# 进入输出目录后（默认端口必须空闲，勿停止已有环境腾端口）
+./isolated-compose.sh up --build -d --wait
+# 从仓库执行；把下面路径替换为实际输出目录
+python3 scripts/smoke-commerce-matrix.py --isolation /private/tmp/commerce-fixes-XXXX/isolation.json --report /private/tmp/commerce-fixes-XXXX/matrix.json
+```
+
+隔离脚本不复制私有 `.env`、服务 config.yaml、日志或现有卷；使用新 key、新 Compose project，清除外部依赖覆盖。它不会自动删除任何资源。若默认端口已占用，可在隔离副本加明确的端口 override，并给矩阵传 `--base-url`、`--ui-urls`、`--jaeger-url`、`--loki-url`、`--prometheus-url`；这种结果须标为端口 override 验证。`--env-file` 可显式指定该隔离环境的签名文件。矩阵是操作员软件回归，不供诊断 Skill 读取，不代表 AI 准确率。
+
+真实 MySQL 边界测试使用单独的固定测试端口和库，避免误连用户 DSN：
+
+```bash
+docker run -d --name commerce-fixes-mysql-test -p 127.0.0.1:23306:3306 \
+  -e MYSQL_DATABASE=commerce_fixes_test -e MYSQL_USER=demo \
+  -e MYSQL_PASSWORD=isolated-test-only -e MYSQL_RANDOM_ROOT_PASSWORD=yes mysql:8.4.4
+# 待初始化完成；只会连接上面这个专用演示库
+bash scripts/test-commerce.sh integration
+```
+
+浏览器回归脚本使用真实业务请求、剪贴板和下载，两个 URL 在脚本顶部列表中：
+
+```bash
+playwright-cli --session commerce-fixes open http://localhost:18086/ui/
+playwright-cli --session commerce-fixes run-code "$(cat scripts/browser-commerce.js)"
+```
+
+当前修复的实际验证、命令、限制与镜像信息见 [2026-09-20 验证记录](docs/observations/2026-09-20-commerce-fixes-validation.md)。
 
 ### 本地检查
 
@@ -205,7 +246,7 @@ python3 scripts/smoke-commerce.py --controls
 - [单次调用链与独立诊断验证](docs/observations/single-call-subagent-validation.md)：同一次故障分别从 TraceId 和业务症状开始调查，不是准确率 benchmark。
 - [综合诊断示例](docs/observations/business-incident-example.md)：根因、传播、影响与证据限制。
 
-这些记录使用过本地缓存依赖版本；默认 Compose 镜像组合的全新环境和 amd64 运行尚未在记录中验证。
+早期记录使用过本地缓存依赖版本；本轮默认镜像、新卷及平台验证以 [修复验证记录](docs/observations/2026-09-20-commerce-fixes-validation.md) 为准，不能据 arm64 实测推断 amd64 通过。
 
 ## 常见问题
 

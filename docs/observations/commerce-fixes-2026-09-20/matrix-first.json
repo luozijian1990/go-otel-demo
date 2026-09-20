@@ -1,0 +1,279 @@
+{
+  "started": "2026-09-20T03:24:27.421558+00:00",
+  "ended": "2026-09-20T03:27:11.702662+00:00",
+  "revision_note": "First rebuilt version before final state-object and outcome-log refinements. Final rerun reported separately.",
+  "isolation": {
+    "project": "commerce-fixes-6e64d81d",
+    "source": "/Users/luozijian/git/go-otel-demo",
+    "directory": "/private/tmp/commerce-fixes-mh27oa05",
+    "new_volumes": true,
+    "overrides": false,
+    "ports": "default",
+    "external_dependencies": false
+  },
+  "metrics_result": "pass",
+  "ui": [
+    {
+      "url": "http://localhost:18083",
+      "result": "pass"
+    },
+    {
+      "url": "http://localhost:18086/ui/",
+      "result": "pass"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "F01",
+      "start": "2026-09-20T03:24:27.421768+00:00",
+      "end": "2026-09-20T03:24:42.126339+00:00",
+      "result": "pass",
+      "request_id": "9fb0e3282c9c41468c744787c916e2e1",
+      "trace_id": "3e467d077dfb995e35ebe234273f6057",
+      "http_status": 200,
+      "duration_ms": 435,
+      "stock_before": 1000000,
+      "stock_after": 1000000,
+      "injection_confirmed": true,
+      "log_services": [
+        "product-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F02",
+      "start": "2026-09-20T03:24:42.127093+00:00",
+      "end": "2026-09-20T03:25:00.344170+00:00",
+      "result": "pass",
+      "request_id": "ad229a3386fd489993c198b6d7151ef0",
+      "trace_id": "55a1dce647e455bd701353e49e56ce95",
+      "http_status": 200,
+      "duration_ms": 3019,
+      "stock_before": 1000000,
+      "stock_after": 1000000,
+      "injection_confirmed": true,
+      "log_services": [
+        "product-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F03",
+      "start": "2026-09-20T03:25:00.346666+00:00",
+      "end": "2026-09-20T03:25:13.513743+00:00",
+      "result": "pass",
+      "request_id": "a4ce09cd1c544968bb129bb7c10144b1",
+      "trace_id": "f8638b6ab6018388d20ec60dbf3441ff",
+      "http_status": 500,
+      "duration_ms": 10,
+      "stock_before": 1000000,
+      "stock_after": 1000000,
+      "injection_confirmed": true,
+      "log_services": [
+        "inventory-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F04",
+      "start": "2026-09-20T03:25:13.515959+00:00",
+      "end": "2026-09-20T03:25:29.686341+00:00",
+      "result": "pass",
+      "request_id": "6227443beb3749ed90d83cd85cf6df3c",
+      "trace_id": "4aeb54e754e461eb404e933fefa588ea",
+      "http_status": 200,
+      "duration_ms": 3017,
+      "stock_before": 1000000,
+      "stock_after": 1000000,
+      "injection_confirmed": true,
+      "log_services": [
+        "inventory-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F05",
+      "start": "2026-09-20T03:25:29.689509+00:00",
+      "end": "2026-09-20T03:25:43.896777+00:00",
+      "result": "pass",
+      "request_id": "9967c87630ec488cb7078fdab758c46c",
+      "trace_id": "f7ce589d0f483452b67cc822794aee85",
+      "http_status": 500,
+      "duration_ms": 14,
+      "stock_before": 1000000,
+      "stock_after": 1000000,
+      "injection_confirmed": true,
+      "log_services": [
+        "order-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F06",
+      "start": "2026-09-20T03:25:43.899758+00:00",
+      "end": "2026-09-20T03:26:01.114630+00:00",
+      "result": "pass",
+      "request_id": "43e8c5e3ead1443cb0f7cd0e948fc159",
+      "trace_id": "9366d34b5fd6fd0d931dbefec245167b",
+      "http_status": 500,
+      "duration_ms": 20,
+      "stock_before": 1000000,
+      "stock_after": 1000000,
+      "injection_confirmed": true,
+      "log_services": [
+        "inventory-service",
+        "order-service",
+        "product-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F07",
+      "start": "2026-09-20T03:26:01.119264+00:00",
+      "end": "2026-09-20T03:26:15.343186+00:00",
+      "result": "pass",
+      "request_id": "e3a4c329923e48bda5c122f8f7e880bc",
+      "trace_id": "15767da6d6c8f60d3d58f6bb00080d37",
+      "http_status": 201,
+      "duration_ms": 3034,
+      "stock_before": 1000000,
+      "stock_after": 999999,
+      "injection_confirmed": true,
+      "log_services": [
+        "inventory-service",
+        "order-service",
+        "product-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F08",
+      "start": "2026-09-20T03:26:15.352684+00:00",
+      "end": "2026-09-20T03:26:29.579911+00:00",
+      "result": "pass",
+      "request_id": "a553bbc40ced48e0bd41d4bcc7bf066e",
+      "trace_id": "9cb82f9188a4123a4660fa56b95eb83f",
+      "http_status": 500,
+      "duration_ms": 20,
+      "stock_before": 1000000,
+      "stock_after": 1000000,
+      "order_state": "payment_failed",
+      "injection_confirmed": true,
+      "log_services": [
+        "inventory-service",
+        "order-service",
+        "payment-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F09",
+      "start": "2026-09-20T03:26:29.589371+00:00",
+      "end": "2026-09-20T03:26:45.820940+00:00",
+      "result": "pass",
+      "request_id": "b38059695671442c87d6f9f2d0650ff6",
+      "trace_id": "cc9fbdf4da5f527ef226b2867114d046",
+      "http_status": 200,
+      "duration_ms": 3025,
+      "stock_before": 1000000,
+      "stock_after": 999999,
+      "order_state": "paid",
+      "injection_confirmed": true,
+      "log_services": [
+        "inventory-service",
+        "order-service",
+        "payment-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "F10",
+      "start": "2026-09-20T03:26:45.831387+00:00",
+      "end": "2026-09-20T03:27:05.095781+00:00",
+      "result": "pass",
+      "request_id": "7d27b4f67e904dc08ad9d39bf1f5ade5",
+      "trace_id": "15d44590c2c8bce458181b4e465a2259",
+      "http_status": 200,
+      "duration_ms": 3032,
+      "stock_before": 999999,
+      "stock_after": 999998,
+      "order_state": "paid",
+      "injection_confirmed": true,
+      "log_services": [
+        "inventory-service",
+        "order-service",
+        "payment-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "healthy-product",
+      "start": "2026-09-20T03:27:05.108804+00:00",
+      "end": "2026-09-20T03:27:06.192048+00:00",
+      "result": "pass",
+      "request_id": "caee529e66f34e84ab50044779ac116a",
+      "trace_id": "e998a4e24df7776fe46c9d22c1870d89",
+      "http_status": 200,
+      "duration_ms": 15,
+      "stock_before": 999998,
+      "stock_after": 999998,
+      "log_services": [
+        "product-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "healthy-inventory",
+      "start": "2026-09-20T03:27:06.204645+00:00",
+      "end": "2026-09-20T03:27:08.301948+00:00",
+      "result": "pass",
+      "request_id": "a14000529878407ebea7c9fa2896e9cb",
+      "trace_id": "6db3d5f1d1d42d56fc2f34d9529b7357",
+      "http_status": 200,
+      "duration_ms": 8,
+      "stock_before": 999998,
+      "stock_after": 999998,
+      "log_services": [
+        "inventory-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "healthy-order",
+      "start": "2026-09-20T03:27:08.313211+00:00",
+      "end": "2026-09-20T03:27:10.450511+00:00",
+      "result": "pass",
+      "request_id": "635ef53d252148e4b926070258f52548",
+      "trace_id": "ce9b072e3c2eac32a86291a232011846",
+      "http_status": 201,
+      "duration_ms": 17,
+      "stock_before": 999998,
+      "stock_after": 999997,
+      "log_services": [
+        "inventory-service",
+        "order-service",
+        "product-service",
+        "traefik"
+      ]
+    },
+    {
+      "case_id": "healthy-payment",
+      "start": "2026-09-20T03:27:10.463186+00:00",
+      "end": "2026-09-20T03:27:11.596520+00:00",
+      "result": "pass",
+      "request_id": "cecfaf00fd7e4f74b62c4bfed6f7f549",
+      "trace_id": "2aac58dcfd8bc8dafe17725858b9a41d",
+      "http_status": 200,
+      "duration_ms": 20,
+      "stock_before": 999998,
+      "stock_after": 999997,
+      "order_state": "paid",
+      "log_services": [
+        "inventory-service",
+        "order-service",
+        "payment-service",
+        "traefik"
+      ]
+    }
+  ]
+}

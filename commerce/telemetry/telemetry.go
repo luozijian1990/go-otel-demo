@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,7 +24,8 @@ var requests = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "demo_http_
 var duration = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "demo_http_request_duration_seconds", Help: "Business request latency", Buckets: []float64{.005, .01, .05, .1, .5, 1, 2, 3, 4, 5, 8, 12}}, []string{"service_name", "http_route", "method"})
 var calls = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "demo_dependency_calls_total", Help: "Actual dependency operations"}, []string{"service_name", "dependency", "operation", "outcome"})
 var depDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "demo_dependency_duration_seconds", Help: "Actual dependency duration", Buckets: []float64{.005, .01, .05, .1, .5, 1, 2, 3, 4, 5, 8, 12}}, []string{"service_name", "dependency", "operation"})
-var fallbacks = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "demo_fallback_total", Help: "Executed fallbacks"}, []string{"service_name", "dependency", "reason"})
+var fallbacks = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "demo_fallback_total", Help: "Fallback attempts after Redis technical failure"}, []string{"service_name", "dependency", "reason"})
+var fallbackResults = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "demo_fallback_results_total", Help: "Completed fallback results"}, []string{"service_name", "dependency", "reason", "outcome"})
 var inflight = prometheus.NewGaugeVec(prometheus.GaugeOpts{Name: "demo_http_inflight_requests", Help: "Active business requests"}, []string{"service_name"})
 
 type contextKey string
@@ -48,7 +50,7 @@ func Init(service string) {
 		}
 		return a
 	}})).With("service_name", service))
-	prometheus.MustRegister(requests, duration, calls, depDuration, fallbacks, inflight)
+	prometheus.MustRegister(requests, duration, calls, depDuration, fallbacks, fallbackResults, inflight)
 	routes := map[string]map[string]string{
 		"order-service":     {"/orders": "POST", "/orders/:id": "GET", "/orders/:id/pay": "POST", "/orders/:id/cancel": "POST"},
 		"product-service":   {"/products/:sku": "GET"},
@@ -62,7 +64,7 @@ func Init(service string) {
 	}
 	for _, dep := range []string{"mysql", "redis"} {
 		for _, op := range []string{"query", "set_get", "get"} {
-			for _, outcome := range []string{"ok", "error"} {
+			for _, outcome := range []string{"ok", "error", "rejected"} {
 				calls.WithLabelValues(service, dep, op, outcome).Add(0)
 			}
 		}
@@ -132,6 +134,11 @@ func Observe(ctx context.Context, dep, op string, start time.Time, err error) {
 		outcome = "error"
 		level = slog.LevelError
 		attrs = append(attrs, "error_message", err.Error())
+		var rejected interface{ BusinessRejected() bool }
+		if errors.As(err, &rejected) && rejected.BusinessRejected() {
+			outcome = "rejected"
+			level = slog.LevelWarn
+		}
 	}
 	calls.WithLabelValues(Service, dep, op, outcome).Inc()
 	depDuration.WithLabelValues(Service, dep, op).Observe(time.Since(start).Seconds())
@@ -139,7 +146,16 @@ func Observe(ctx context.Context, dep, op string, start time.Time, err error) {
 }
 func Fallback(ctx context.Context) {
 	fallbacks.WithLabelValues(Service, "redis", "unavailable").Inc()
-	Log(ctx, slog.LevelWarn, "fallback served", "dependency", "redis")
+	Log(ctx, slog.LevelWarn, "fallback_attempted", "dependency", "redis")
+}
+func FallbackResult(ctx context.Context, err error) {
+	outcome, message := "success", "fallback_succeeded"
+	level := slog.LevelInfo
+	if err != nil {
+		outcome, message, level = "failure", "fallback_failed", slog.LevelWarn
+	}
+	fallbackResults.WithLabelValues(Service, "redis", "unavailable", outcome).Inc()
+	Log(ctx, level, message, "dependency", "redis", "outcome", outcome)
 }
 func Register(r *gin.Engine, ready func(context.Context) error) {
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))

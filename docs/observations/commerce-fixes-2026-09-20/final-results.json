@@ -1,0 +1,22 @@
+{
+  "unit": "pass",
+  "python_tests": 14,
+  "dom_tests": 6,
+  "browser_entries": 2,
+  "first_real_matrix_passes": 14,
+  "final_mysql_regression": {
+    "status": "environment_error",
+    "exit_code": 1,
+    "duration_seconds": 91.015,
+    "symptom": "MySQL i/o timeout; test timed out after 90s"
+  },
+  "final_agent_rebuild": {
+    "status": "not_completed",
+    "exit_code": 130,
+    "reason": "interrupted after more than 10 minutes without compile progress"
+  },
+  "final_matrix_rerun": "not_run",
+  "final_container_restart_recovery": "not_run",
+  "amd64": "not_run",
+  "ai_diagnosis": "not_run"
+}
